@@ -8,13 +8,22 @@ import {
   ArrowRight,
   ClockCountdown,
   Plant,
+  Smiley,
+  VideoCamera,
+  PlayCircle,
+  ArrowSquareOut,
 } from '@phosphor-icons/react';
 
 import casaAdobeImg from '../assets/images/casa-adobe-sm.webp';
+import { KIDS_VIDEOS } from './KidsRightsView';
 
 export const LearnRightsView: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedTopic, setSelectedTopic] = useState<'peticion' | 'tutela'>('peticion');
+  const [selectedTopic, setSelectedTopic] = useState<'peticion' | 'tutela' | 'ninos'>('peticion');
+  const [activeKidVideoId, setActiveKidVideoId] = useState<string>('video-1');
+
+  const activeKidVideo =
+    KIDS_VIDEOS.find((v) => v.id === activeKidVideoId) || KIDS_VIDEOS[0];
 
   return (
     <div className="flex flex-col gap-6 py-6">
@@ -56,7 +65,7 @@ export const LearnRightsView: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-2 gap-2.5 p-1.5 bg-olive-100 border-2 border-olive-300 rounded-2xl">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-1.5 bg-olive-100 border-2 border-olive-300 rounded-2xl">
         <button
           type="button"
           onClick={() => setSelectedTopic('peticion')}
@@ -80,6 +89,18 @@ export const LearnRightsView: React.FC = () => {
         >
           <ShieldCheck weight="duotone" className="w-5 h-5 shrink-0" />
           <span>Acción de Tutela</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedTopic('ninos')}
+          className={`min-h-[50px] py-2.5 px-4 text-xs sm:text-sm font-black rounded-xl transition flex items-center justify-center gap-2 ${
+            selectedTopic === 'ninos'
+              ? 'bg-amber-400 text-charcoal-950 shadow-sm border border-charcoal-900 font-black'
+              : 'text-charcoal-800 hover:text-charcoal-950 hover:bg-white/60'
+          }`}
+        >
+          <Smiley weight="bold" className="w-5 h-5 shrink-0 text-charcoal-950" />
+          <span>Para Niños (Videos)</span>
         </button>
       </div>
 
@@ -124,7 +145,7 @@ export const LearnRightsView: React.FC = () => {
             </div>
           </div>
         </article>
-      ) : (
+      ) : selectedTopic === 'tutela' ? (
         <article className="flex flex-col gap-5 bg-white p-6 rounded-3xl border-2 border-charcoal-800 shadow-sm animate-fadeIn">
           <div className="flex items-center gap-3 text-institucional-700">
             <div className="w-11 h-11 rounded-2xl bg-institucional-50 border border-institucional-200 flex items-center justify-center shrink-0">
@@ -160,6 +181,83 @@ export const LearnRightsView: React.FC = () => {
                 potable mínima para la familia o falta de cupo escolar para menores.
               </p>
             </div>
+          </div>
+        </article>
+      ) : (
+        /* Sección Para Niños: Videos Educativos */
+        <article className="flex flex-col gap-6 bg-white p-6 sm:p-8 rounded-3xl border-2 border-charcoal-800 shadow-sm animate-fadeIn">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-olive-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2 text-amber-800 text-xs font-black uppercase tracking-wider mb-1">
+                <Smiley weight="fill" className="w-4 h-4 text-amber-600" />
+                <span>Semillero de Justicia: Videos para Niñas y Niños</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-charcoal-950 font-editorial">
+                {activeKidVideo.titulo}
+              </h3>
+              <p className="text-xs text-charcoal-700 mt-0.5 font-medium">
+                {activeKidVideo.subtitulo}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/ninos')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-500 text-charcoal-950 text-xs font-black border border-charcoal-900 transition self-start sm:self-auto"
+            >
+              <span>Ver sala completa</span>
+              <ArrowRight weight="bold" className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Selector de los 3 videos en píldoras */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {KIDS_VIDEOS.map((v, i) => {
+              const isSelected = v.id === activeKidVideoId;
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => setActiveKidVideoId(v.id)}
+                  className={`p-3 rounded-xl border-2 text-left transition flex items-center gap-2.5 ${
+                    isSelected
+                      ? 'bg-institucional-900 text-white border-charcoal-950 shadow-sm'
+                      : 'bg-olive-50 hover:bg-white text-charcoal-900 border-olive-300'
+                  }`}
+                >
+                  <PlayCircle weight={isSelected ? 'fill' : 'duotone'} className="w-5 h-5 shrink-0 text-aqua-400" />
+                  <div className="truncate">
+                    <span className="block text-[10px] uppercase font-mono font-bold text-amber-400">
+                      Video #{i + 1}
+                    </span>
+                    <span className="block text-xs font-black truncate font-editorial">
+                      {v.titulo}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Reproductor Responsivo */}
+          <div className="relative aspect-video w-full rounded-2xl overflow-hidden border-2 border-charcoal-950 shadow-md bg-charcoal-950">
+            <iframe
+              key={activeKidVideo.youtubeId}
+              src={`https://www.youtube-nocookie.com/embed/${activeKidVideo.youtubeId}?rel=0&modestbranding=1`}
+              title={activeKidVideo.titulo}
+              className="absolute inset-0 w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </div>
+
+          <div className="p-4 rounded-2xl bg-olive-50 border border-olive-300 text-xs text-charcoal-800 space-y-2">
+            <h4 className="font-black text-charcoal-950 uppercase tracking-wide">
+              ¿Por qué es importante para la niñez?
+            </h4>
+            <p className="leading-relaxed">
+              {activeKidVideo.descripcion}
+            </p>
           </div>
         </article>
       )}

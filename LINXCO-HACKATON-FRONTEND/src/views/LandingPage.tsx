@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Plant,
   Scales,
+  Smiley,
 } from '@phosphor-icons/react';
 
 import heroPuebloImg from '../assets/images/pueblo-andino-lg.webp';
@@ -126,6 +127,38 @@ export const LandingPage: React.FC = () => {
           />
         </button>
       </nav>
+
+      {/* Sección Para Niños: Semillero de Derechos */}
+      <section className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-amber-100 via-amber-50 to-olive-100 border-2 border-charcoal-900 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-amber-400 border-2 border-charcoal-900 flex items-center justify-center text-charcoal-950 shrink-0 shadow-sm">
+            <Smiley weight="fill" className="w-8 h-8 text-charcoal-950" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-300 text-charcoal-900 border border-amber-500 font-mono">
+                Semillero de Derechos
+              </span>
+              <span className="text-xs font-bold text-charcoal-700">3 Videos Animados</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-charcoal-950 font-editorial">
+              Sección para Niñas, Niños y Jóvenes
+            </h3>
+            <p className="text-xs sm:text-sm text-charcoal-700 mt-0.5">
+              ¿Qué son los deberes y derechos? ¿Qué es la Constitución? Aprende con videos sencillos y divertidos.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => navigate('/ninos')}
+          className="min-h-[52px] px-6 py-3 rounded-xl bg-charcoal-900 hover:bg-institucional-600 text-white font-black text-xs sm:text-sm border border-charcoal-950 shadow-sm transition shrink-0 active:scale-95 inline-flex items-center gap-2"
+        >
+          <span>Ver Videos para Niños</span>
+          <ArrowRight weight="bold" className="w-4 h-4 text-aqua-300" />
+        </button>
+      </section>
 
       {/* Franja minimalista de respaldo constitucional (sin saturación visual) */}
       <section className="p-5 sm:p-6 rounded-2xl bg-olive-100/70 border border-olive-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

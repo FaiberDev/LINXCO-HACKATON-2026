@@ -10,6 +10,7 @@ import {
   SignOut,
   X,
   WhatsappLogo,
+  Smiley,
 } from '@phosphor-icons/react';
 
 export const Header: React.FC = () => {
@@ -101,6 +102,15 @@ export const Header: React.FC = () => {
               </button>
             </div>
           )}
+
+          <Link
+            to="/ninos"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-black border border-amber-400 transition shadow-sm"
+            title="Sección Educativa en Video Para Niñas y Niños"
+          >
+            <Smiley weight="bold" className="w-4 h-4 text-amber-700" />
+            <span className="hidden sm:inline">Para Niños</span>
+          </Link>
 
           <Link
             to="/bot"

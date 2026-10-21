@@ -13,6 +13,7 @@ import { ContinuationPortal } from './views/ContinuationPortal';
 import { WizardView } from './views/WizardView';
 import { CaseStatusView } from './views/CaseStatusView';
 import { LearnRightsView } from './views/LearnRightsView';
+import { KidsRightsView } from './views/KidsRightsView';
 import { LegalClinicView } from './views/LegalClinicView';
 import { WhatsAppBotControlView } from './views/WhatsAppBotControlView';
 
@@ -39,6 +40,8 @@ export const AppContent: React.FC = () => {
           <Route path="/estado" element={<CaseStatusView />} />
           <Route path="/estado/:codigo" element={<CaseStatusView />} />
           <Route path="/aprender" element={<LearnRightsView />} />
+          <Route path="/ninos" element={<KidsRightsView />} />
+          <Route path="/para-ninos" element={<KidsRightsView />} />
           <Route path="/asesor" element={<LegalClinicView />} />
           <Route path="/bot" element={<WhatsAppBotControlView />} />
           <Route path="/admin/bot" element={<WhatsAppBotControlView />} />
