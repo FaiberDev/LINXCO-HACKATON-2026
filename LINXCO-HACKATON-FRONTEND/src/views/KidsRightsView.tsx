@@ -7,8 +7,6 @@ import {
   VideoCamera,
   PlayCircle,
   BookOpenText,
-  ShieldCheck,
-  Scales,
   GraduationCap,
   Heart,
   ArrowSquareOut,

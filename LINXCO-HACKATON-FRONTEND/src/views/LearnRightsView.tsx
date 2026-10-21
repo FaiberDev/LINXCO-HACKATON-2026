@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   BookOpenText,
@@ -9,9 +9,7 @@ import {
   ClockCountdown,
   Plant,
   Smiley,
-  VideoCamera,
   PlayCircle,
-  ArrowSquareOut,
 } from '@phosphor-icons/react';
 
 import casaAdobeImg from '../assets/images/casa-adobe-sm.webp';
@@ -19,8 +17,17 @@ import { KIDS_VIDEOS } from './KidsRightsView';
 
 export const LearnRightsView: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedTopic, setSelectedTopic] = useState<'peticion' | 'tutela' | 'ninos'>('peticion');
+  const [searchParams] = useSearchParams();
+  const temaParam = searchParams.get('tema');
+  const initialTopic = temaParam === 'ninos' || temaParam === 'tutela' ? temaParam : 'peticion';
+  const [selectedTopic, setSelectedTopic] = useState<'peticion' | 'tutela' | 'ninos'>(initialTopic);
   const [activeKidVideoId, setActiveKidVideoId] = useState<string>('video-1');
+
+  useEffect(() => {
+    if (temaParam === 'ninos' || temaParam === 'tutela' || temaParam === 'peticion') {
+      setSelectedTopic(temaParam);
+    }
+  }, [temaParam]);
 
   const activeKidVideo =
     KIDS_VIDEOS.find((v) => v.id === activeKidVideoId) || KIDS_VIDEOS[0];

@@ -63,6 +63,8 @@ export interface Caso {
   estado: EstadoCaso;
   formulario_web?: FormularioWeb | null;
   ruta_documento?: string | null;
+  ruta_documento_pdf?: string | null;
+  ruta_documento_docx?: string | null;
   created_at?: string;
   is_offline?: boolean;
 }

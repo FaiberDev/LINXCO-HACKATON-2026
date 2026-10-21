@@ -456,5 +456,63 @@ describe('Linxco Backend REST API & Modules', () => {
       // Should have eliminated the ANEXOS section
       assert.strictEqual(/(?:PRUEBAS Y ANEXOS|ANEXOS Y PRUEBAS|\bANEXOS\b)/i.test(text), false);
     });
+
+    it('should generate structured legal documents with bold section headers and ordinal numbering in Word and PDF', async () => {
+      const res = generarDocumentoDesdePlantilla({
+        codigo: 'CASO-LEG',
+        datosCiudadano: {
+          ciudadano: {
+            nombre_completo: 'Mariana Valencia',
+            numero_documento: '1098765432',
+            telefono: '3157890123',
+            correo: 'mariana@example.com',
+            municipio: 'La Cumbre',
+            departamento: 'Valle del Cauca',
+            vereda: 'Vereda El Carmen',
+            direccion: 'Finca Bellavista',
+          },
+          entidad: 'Nueva EPS',
+          problema: 'No me entregan medicamentos',
+          hechos: 'Fórmula médica pendiente desde hace 15 días sin despacho oportuno',
+          peticion: 'Entrega urgente de tratamiento',
+          NOMBRE_MEDICAMENTO: 'Metformina 850mg',
+          DIAGNOSTICO_MEDICO: 'Diabetes Tipo 2',
+          CANTIDAD_PRESCRITA: '30 tabletas',
+          DOSIS_FRECUENCIA: '1 cada 12 horas',
+        },
+        plantilla: 'Plantilla Accion de Tutela Medicamentos Colombia.docx',
+      });
+
+      assert.ok(fs.existsSync(res.filePath));
+      assert.ok(res.rutaDocumento.endsWith('.docx'));
+      assert.ok(res.rutaDocumentoPdf.endsWith('.pdf'));
+
+      const zip = new PizZip(fs.readFileSync(res.filePath));
+      const xml = zip.file('word/document.xml').asText();
+
+      // Check bold headers and ordinal numbering
+      assert.ok(xml.includes('HECHOS'));
+      assert.ok(xml.includes('PRIMERO.'));
+      assert.ok(xml.includes('SEGUNDO.'));
+      assert.ok(xml.includes('PRETENSIONES'));
+      assert.ok(xml.includes('PRIMERA.'));
+      assert.ok(xml.includes('NOTIFICACIONES'));
+
+      // Verify bold tags are present in the Word XML
+      const boldTags = xml.match(/<w:b(?:\s|\/|>)/g) || [];
+      assert.ok(boldTags.length >= 20, `Debería tener al menos 20 tags de negrilla, tiene ${boldTags.length}`);
+
+      // Verify PDF generation and endpoint
+      const { generarPdfDesdeDocx } = require('../services/pdfService.js');
+      await generarPdfDesdeDocx(res.filePath, res.filePathPdf, 'CASO-LEG');
+      assert.ok(fs.existsSync(res.filePathPdf));
+
+      const pdfFetch = await fetch(`${baseUrl}${res.rutaDocumentoPdf}`);
+      assert.strictEqual(pdfFetch.status, 200);
+      assert.strictEqual(pdfFetch.headers.get('content-type'), 'application/pdf');
+      const pdfBuffer = await pdfFetch.arrayBuffer();
+      const pdfHeader = Buffer.from(pdfBuffer).slice(0, 5).toString();
+      assert.strictEqual(pdfHeader, '%PDF-');
+    });
   });
 });

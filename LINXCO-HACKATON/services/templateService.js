@@ -587,6 +587,7 @@ function generarDocumentoDesdePlantilla({
   const variables = construirVariablesPlantilla(datosCiudadano, codigo);
   doc.render(variables);
 
+  const { generarPdfDesdeDocx } = require('./pdfService');
   const bufferGenerado = doc.getZip().generate({
     type: 'nodebuffer',
     compression: 'DEFLATE',
@@ -608,10 +609,26 @@ function generarDocumentoDesdePlantilla({
 
   const rutaDocumento = `/api/documentos/${filename}`;
 
+  const filenamePdf = `${cleanCode}_${slugPlantilla}.pdf`;
+  const filePathPdf = path.join(DOCUMENTOS_DIR, filenamePdf);
+  const rutaDocumentoPdf = `/api/documentos/${filenamePdf}`;
+
+  try {
+    // Generar PDF estructurado automáticamente en paralelo
+    generarPdfDesdeDocx(filePath, filePathPdf, cleanCode).catch((err) => {
+      console.warn('Advertencia en generación asíncrona de PDF:', err.message);
+    });
+  } catch (pdfErr) {
+    console.warn('Advertencia lanzando generación de PDF:', pdfErr.message);
+  }
+
   return {
     filename,
     filePath,
     rutaDocumento,
+    filenamePdf,
+    filePathPdf,
+    rutaDocumentoPdf,
     plantillaUsada: nombrePlantilla,
     variablesInyectadas: variables,
   };

@@ -13,6 +13,7 @@ import {
   SignOut,
   DownloadSimple,
   FileDoc,
+  FileText,
   CheckCircle,
   WarningCircle,
   FolderOpen,
@@ -378,6 +379,11 @@ export const AsesorDashboardView: React.FC = () => {
             const docUrl =
               caso.ruta_documento ||
               (typeof fw.ruta_documento === 'string' ? fw.ruta_documento : null);
+            const pdfUrl =
+              (typeof fw.ruta_documento_pdf === 'string' ? fw.ruta_documento_pdf : null) ||
+              (docUrl
+                ? docUrl.replace(/\.docx$/i, '.pdf')
+                : `/api/casos/${encodeURIComponent(caso.codigo_sms)}/pdf`);
 
             return (
               <div
@@ -504,16 +510,31 @@ export const AsesorDashboardView: React.FC = () => {
 
                       <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
                         {docUrl && (
-                          <a
-                            href={docUrl}
-                            download
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="min-h-[44px] px-4 py-2 rounded-xl bg-olive-700 hover:bg-olive-800 text-white font-black text-xs inline-flex items-center gap-2 border-2 border-charcoal-950 transition"
-                          >
-                            <DownloadSimple weight="bold" className="w-4 h-4" />
-                            <span>Descargar Documento (.docx)</span>
-                          </a>
+                          <>
+                            <a
+                              href={docUrl}
+                              download
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-olive-700 hover:bg-olive-800 text-white font-black text-xs inline-flex items-center gap-1.5 border-2 border-charcoal-950 transition shadow-sm"
+                              title="Descargar versión Word editable"
+                            >
+                              <DownloadSimple weight="bold" className="w-4 h-4" />
+                              <span>Descargar Word (.docx)</span>
+                            </a>
+
+                            <a
+                              href={pdfUrl}
+                              download
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-institucional-600 hover:bg-institucional-700 text-white font-black text-xs inline-flex items-center gap-1.5 border-2 border-charcoal-950 transition shadow-sm"
+                              title="Descargar versión PDF oficial"
+                            >
+                              <FileText weight="duotone" className="w-4 h-4" />
+                              <span>Descargar PDF (.pdf)</span>
+                            </a>
+                          </>
                         )}
 
                         <button
@@ -527,8 +548,8 @@ export const AsesorDashboardView: React.FC = () => {
                             {generatingDocId === rowKey
                               ? 'Generando...'
                               : docUrl
-                              ? 'Regenerar .docx'
-                              : 'Generar .docx'}
+                              ? 'Regenerar Documentos'
+                              : 'Generar Documentos'}
                           </span>
                         </button>
                       </div>

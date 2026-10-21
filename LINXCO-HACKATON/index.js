@@ -656,6 +656,7 @@ const {
   listarPlantillasDisponibles,
   DOCUMENTOS_DIR,
 } = require('./services/templateService');
+const { generarPdfDesdeDocx } = require('./services/pdfService');
 const {
   ROLES_ADMIN,
   signToken,
@@ -793,14 +794,79 @@ app.get('/api/plantillas', (req, res) => {
   });
 });
 
-// ---- API REST: Descargar documento .docx generado ----
-app.get(['/api/documentos/:filename', '/documentos/:filename'], (req, res) => {
-  const safeName = path.basename(req.params.filename || '');
-  const fullPath = path.join(DOCUMENTOS_DIR, safeName);
-  if (!safeName || !fs.existsSync(fullPath)) {
-    return res.status(404).json({ error: 'Documento no encontrado' });
+// ---- API REST: Descargar documento (.docx o .pdf) generado ----
+app.get(['/api/documentos/:filename', '/documentos/:filename'], async (req, res) => {
+  try {
+    const safeName = path.basename(req.params.filename || '');
+    let fullPath = path.join(DOCUMENTOS_DIR, safeName);
+
+    // Si se solicita un PDF que aún no existe, pero existe el .docx correspondiente, generarlo al vuelo
+    if (safeName.toLowerCase().endsWith('.pdf') && !fs.existsSync(fullPath)) {
+      const docxName = safeName.replace(/\.pdf$/i, '.docx');
+      const docxPath = path.join(DOCUMENTOS_DIR, docxName);
+      if (fs.existsSync(docxPath)) {
+        const codigo = safeName.split('_')[0] || 'CASO-DOC';
+        await generarPdfDesdeDocx(docxPath, fullPath, codigo);
+      }
+    }
+
+    if (!safeName || !fs.existsSync(fullPath)) {
+      return res.status(404).json({ error: 'Documento no encontrado' });
+    }
+
+    if (safeName.toLowerCase().endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+    }
+    res.download(fullPath, safeName);
+  } catch (err) {
+    console.error('Error al descargar documento:', err);
+    res.status(500).json({ error: 'Error al procesar el documento' });
   }
-  res.download(fullPath, safeName);
+});
+
+// ---- API REST: Descargar PDF legal oficial por código de caso ----
+app.get(['/api/casos/:codigo/pdf', '/api/solicitudes/:codigo/pdf'], async (req, res) => {
+  try {
+    const rawCodigo = req.params.codigo || '';
+    const codigo = rawCodigo.trim().toUpperCase();
+    const caso = await Solicitud.findByCodigo(codigo);
+    if (!caso) {
+      return res.status(404).json({ error: 'Caso no encontrado', codigo });
+    }
+
+    const files = fs.existsSync(DOCUMENTOS_DIR) ? fs.readdirSync(DOCUMENTOS_DIR) : [];
+    const pdfFile = files.find((f) => f.startsWith(codigo + '_') && f.toLowerCase().endsWith('.pdf'));
+    const docxFile = files.find((f) => f.startsWith(codigo + '_') && f.toLowerCase().endsWith('.docx'));
+
+    let pdfPath = null;
+    if (pdfFile) {
+      pdfPath = path.join(DOCUMENTOS_DIR, pdfFile);
+    } else if (docxFile) {
+      const docPath = path.join(DOCUMENTOS_DIR, docxFile);
+      pdfPath = path.join(DOCUMENTOS_DIR, docxFile.replace(/\.docx$/i, '.pdf'));
+      await generarPdfDesdeDocx(docPath, pdfPath, codigo);
+    } else {
+      const form = caso.formulario_web || {};
+      const docInfo = generarDocumentoDesdePlantilla({
+        codigo: caso.codigo_sms,
+        datosCiudadano: form,
+        tipoTramite: caso.tipo_problema,
+        plantilla: form.plantilla,
+      });
+      pdfPath = docInfo.filePathPdf;
+      await generarPdfDesdeDocx(docInfo.filePath, pdfPath, codigo);
+    }
+
+    if (!pdfPath || !fs.existsSync(pdfPath)) {
+      return res.status(404).json({ error: 'No se pudo generar el documento PDF del caso' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.download(pdfPath, path.basename(pdfPath));
+  } catch (err) {
+    console.error('Error en GET /casos/:codigo/pdf:', err);
+    res.status(500).json({ error: 'Error interno generando PDF del caso' });
+  }
 });
 
 // ---- API REST: Listar todas las solicitudes / casos (Con protección de aislamiento por rol) ----
@@ -1215,6 +1281,8 @@ app.post('/api/generar-documento', async (req, res) => {
         formulario_web: {
           ...datosCombinados,
           ruta_documento: resultadoDoc.rutaDocumento,
+          ruta_documento_docx: resultadoDoc.rutaDocumento,
+          ruta_documento_pdf: resultadoDoc.rutaDocumentoPdf,
           plantilla_usada: resultadoDoc.plantillaUsada,
           fecha_generacion_documento: new Date().toISOString(),
         },
@@ -1229,6 +1297,8 @@ app.post('/api/generar-documento', async (req, res) => {
       plantilla_usada: resultadoDoc.plantillaUsada,
       archivo_generado: resultadoDoc.filename,
       ruta_documento: resultadoDoc.rutaDocumento,
+      ruta_documento_docx: resultadoDoc.rutaDocumento,
+      ruta_documento_pdf: resultadoDoc.rutaDocumentoPdf,
       solicitud: solicitudActualizada,
       caso: solicitudActualizada,
     });

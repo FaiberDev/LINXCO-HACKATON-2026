@@ -212,18 +212,50 @@ export const CaseStatusView: React.FC = () => {
               </div>
             )}
 
-            {/* Generated Document Download if available */}
-            {Boolean(activeCase.ruta_documento || activeCase.formulario_web?.ruta_documento) && (
-              <a
-                href={String(activeCase.ruta_documento || activeCase.formulario_web?.ruta_documento)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-olive-700 hover:bg-olive-800 text-white font-bold text-sm flex items-center justify-center gap-2 border-2 border-charcoal-950 transition"
-              >
-                <FileText weight="duotone" className="w-5 h-5" />
-                <span>Descargar Documento Generado (.docx)</span>
-              </a>
-            )}
+            {/* Generated Document Download with role-based restriction */}
+            {Boolean(activeCase.ruta_documento || activeCase.formulario_web?.ruta_documento) && (() => {
+              const isOfficial = Boolean(
+                user && (user.rol === 'Jefe de Consultorio' || user.rol === 'Asesor Jurídico')
+              );
+              const docxUrl = String(
+                activeCase.ruta_documento || activeCase.formulario_web?.ruta_documento || ''
+              );
+              const pdfUrl = String(
+                activeCase.ruta_documento_pdf ||
+                activeCase.formulario_web?.ruta_documento_pdf ||
+                (docxUrl ? docxUrl.replace(/\.docx$/i, '.pdf') : `/api/casos/${encodeURIComponent(activeCase.codigo_sms)}/pdf`)
+              );
+
+              return (
+                <div className="flex flex-col gap-2">
+                  {/* Los ciudadanos SOLO pueden descargar el PDF estructurado oficial */}
+                  <a
+                    href={pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                    className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-olive-700 hover:bg-olive-800 text-white font-black text-sm flex items-center justify-center gap-2 border-2 border-charcoal-950 transition shadow-sm"
+                  >
+                    <FileText weight="duotone" className="w-5 h-5" />
+                    <span>Descargar Documento Oficial (.pdf)</span>
+                  </a>
+
+                  {/* Exclusivo para Asesores y Jefes de consultorio: versión editable Word */}
+                  {isOfficial && docxUrl && (
+                    <a
+                      href={docxUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                      className="w-full min-h-[46px] px-4 py-2.5 rounded-xl bg-white hover:bg-olive-100 text-charcoal-950 font-bold text-xs flex items-center justify-center gap-2 border-2 border-charcoal-800 transition"
+                    >
+                      <FileText weight="duotone" className="w-4 h-4 text-institucional-600" />
+                      <span>Descargar Versión Editable (.docx) [Exclusivo Asesor]</span>
+                    </a>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Action to edit/resume if in BORRADOR (Ciudadano solo puede editar cuando está en BORRADOR) */}
             {activeCase.estado === 'BORRADOR' && (

@@ -239,6 +239,14 @@ export const WhatsAppBotControlView: React.FC = () => {
                   Número: {botData.phoneNumber}
                 </div>
               )}
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={!!actionLoading}
+                className="mt-2 text-xs font-bold text-rose-700 hover:underline inline-flex items-center gap-1"
+              >
+                <span>Cerrar sesión / Desvincular este WhatsApp</span>
+              </button>
             </div>
           ) : botData?.qrDataUrl ? (
             <div className="space-y-3">

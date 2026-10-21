@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCase } from '../context/CaseContext';
+import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../services/api';
 import { MunicipalityAutocomplete } from '../components/forms/MunicipalityAutocomplete';
 import {
@@ -403,10 +404,16 @@ export const WizardView: React.FC = () => {
     wizardDraft.ciudadano?.telefono || ''
   );
 
+  const { user } = useAuth();
+  const isOfficial = Boolean(
+    user && (user.rol === 'Jefe de Consultorio' || user.rol === 'Asesor Jurídico')
+  );
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submittedCode, setSubmittedCode] = useState<string | null>(null);
   const [submittedDocUrl, setSubmittedDocUrl] = useState<string | null>(null);
+  const [submittedPdfUrl, setSubmittedPdfUrl] = useState<string | null>(null);
   const [esHandoffAsesor, setEsHandoffAsesor] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
 
@@ -705,6 +712,8 @@ export const WizardView: React.FC = () => {
         success: boolean;
         codigo: string;
         ruta_documento?: string;
+        ruta_documento_docx?: string;
+        ruta_documento_pdf?: string;
       }>('/generar-documento', {
         method: 'POST',
         body: JSON.stringify({
@@ -717,7 +726,13 @@ export const WizardView: React.FC = () => {
 
       setEsHandoffAsesor(false);
       setSubmittedCode(genRes.codigo);
-      setSubmittedDocUrl(genRes.ruta_documento || null);
+      setSubmittedDocUrl(genRes.ruta_documento || genRes.ruta_documento_docx || null);
+      setSubmittedPdfUrl(
+        genRes.ruta_documento_pdf ||
+          (genRes.ruta_documento
+            ? genRes.ruta_documento.replace(/\.docx$/i, '.pdf')
+            : `/api/casos/${encodeURIComponent(genRes.codigo)}/pdf`)
+      );
       clearWizardDraft();
     } catch {
       // Fallback local si el backend está offline
@@ -1243,17 +1258,32 @@ export const WizardView: React.FC = () => {
           {copied && <span className="text-xs text-olive-800 font-bold">¡Código copiado!</span>}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 mt-2">
-          {submittedDocUrl && (
+        <div className="flex flex-col sm:flex-row gap-3 mt-2 flex-wrap">
+          {/* Ciudadanos SOLO pueden descargar el PDF estructurado oficial */}
+          {(submittedPdfUrl || submittedDocUrl) && (
             <a
-              href={submittedDocUrl}
+              href={submittedPdfUrl || `/api/casos/${encodeURIComponent(submittedCode)}/pdf`}
               download
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 min-h-[50px] px-4 py-3 rounded-xl bg-olive-700 hover:bg-olive-800 text-white font-black text-sm flex items-center justify-center gap-2 border-2 border-charcoal-950 shadow-sm transition"
             >
               <DownloadSimple weight="bold" className="w-5 h-5" />
-              <span>Descargar Documento (.docx)</span>
+              <span>Descargar Documento Oficial (.pdf)</span>
+            </a>
+          )}
+
+          {/* Exclusivo para Asesores y Jefes de consultorio: versión editable Word */}
+          {isOfficial && submittedDocUrl && (
+            <a
+              href={submittedDocUrl}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 min-h-[50px] px-4 py-3 rounded-xl bg-white hover:bg-olive-100 text-charcoal-950 font-bold text-sm flex items-center justify-center gap-2 border-2 border-charcoal-800 shadow-sm transition"
+            >
+              <FileDoc weight="duotone" className="w-5 h-5 text-institucional-600" />
+              <span>Descargar Word (.docx) [Asesor]</span>
             </a>
           )}
 

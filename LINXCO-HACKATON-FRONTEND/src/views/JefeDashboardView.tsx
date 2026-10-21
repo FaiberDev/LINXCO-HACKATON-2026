@@ -16,6 +16,7 @@ import {
   WarningCircle,
   SignOut,
   FileText,
+  DownloadSimple,
   ChartBar,
   UsersThree,
   FolderOpen,
@@ -540,6 +541,11 @@ export const JefeDashboardView: React.FC = () => {
                   const docUrl =
                     caso.ruta_documento ||
                     (caso.formulario_web?.ruta_documento as string | undefined);
+                  const pdfUrl =
+                    (caso.formulario_web?.ruta_documento_pdf as string | undefined) ||
+                    (docUrl
+                      ? docUrl.replace(/\.docx$/i, '.pdf')
+                      : `/api/casos/${encodeURIComponent(caso.codigo_sms)}/pdf`);
 
                   return (
                     <tr
@@ -557,15 +563,31 @@ export const JefeDashboardView: React.FC = () => {
                           </p>
                         )}
                         {docUrl && (
-                          <a
-                            href={docUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-institucional-700 hover:underline"
-                          >
-                            <FileText weight="duotone" className="w-3.5 h-3.5" />
-                            <span>Ver .docx</span>
-                          </a>
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <a
+                              href={docUrl}
+                              download
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-olive-800 hover:underline"
+                              title="Descargar versión Word (.docx)"
+                            >
+                              <FileText weight="duotone" className="w-3.5 h-3.5" />
+                              <span>Word (.docx)</span>
+                            </a>
+                            <span className="text-charcoal-400 text-xs">•</span>
+                            <a
+                              href={pdfUrl}
+                              download
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-institucional-700 hover:underline"
+                              title="Descargar versión PDF oficial (.pdf)"
+                            >
+                              <DownloadSimple weight="bold" className="w-3.5 h-3.5" />
+                              <span>PDF (.pdf)</span>
+                            </a>
+                          </div>
                         )}
                       </td>
 
