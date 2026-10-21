@@ -1,0 +1,18 @@
+# Ignore unrelated folders in workspace
+amazon-survival/
+mars-survival-short/
+
+# Dependencies & build output
+**/node_modules/
+**/dist/
+
+# Secrets & WhatsApp session credentials
+**/.env
+**/.env.*
+!**/.env.example
+**/auth_info_baileys/
+
+# Generated runtime documents & agent artifacts
+**/.agents/
+**/documentos_generados/*.docx
+**/skills-lock.json
