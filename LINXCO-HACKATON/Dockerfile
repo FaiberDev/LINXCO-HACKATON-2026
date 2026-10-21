@@ -2,11 +2,8 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Instalar dependencias necesarias para Node y librerías nativas si aplica
-RUN apk add --no-cache python3 make g++
-
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN npm install --omit=dev && npm cache clean --force
 
 COPY . .
 

@@ -22,4 +22,5 @@ jobs:
           fi
           docker compose down --remove-orphans || true
           docker compose up -d --build
+          docker image prune -f || true
           echo "¡Despliegue completado con éxito!"
