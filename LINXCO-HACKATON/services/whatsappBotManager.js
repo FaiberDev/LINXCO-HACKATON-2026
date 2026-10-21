@@ -38,7 +38,10 @@ class WhatsAppBotManager {
   cleanAuthFiles() {
     if (fs.existsSync(AUTH_DIR)) {
       try {
-        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+        const files = fs.readdirSync(AUTH_DIR);
+        for (const file of files) {
+          fs.rmSync(path.join(AUTH_DIR, file), { recursive: true, force: true });
+        }
         this.log('Credenciales de sesión borradas de auth_info_baileys.', 'info');
       } catch (err) {
         console.error('Error borrando credenciales:', err.message);
