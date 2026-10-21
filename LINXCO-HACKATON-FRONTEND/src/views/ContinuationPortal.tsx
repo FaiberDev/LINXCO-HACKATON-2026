@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCase } from '../context/CaseContext';
 import {
   PlusCircle,
@@ -13,12 +13,29 @@ import veredaValleImg from '../assets/images/vereda-valle-lg.webp';
 
 export const ContinuationPortal: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { loadCaseByCode, clearWizardDraft } = useCase();
 
   const [showCodeInput, setShowCodeInput] = useState<boolean>(false);
   const [codeInput, setCodeInput] = useState<string>('');
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+
+  // Si llega con parámetro en la URL (?caso=CASO-XXX o ?codigo=CASO-XXX), redirigir directamente a /estado/:codigo
+  useEffect(() => {
+    const paramCode = searchParams.get('caso') || searchParams.get('codigo');
+    if (paramCode) {
+      const clean = paramCode.trim().toUpperCase();
+      loadCaseByCode(clean)
+        .then(() => {
+          navigate(`/estado/${encodeURIComponent(clean)}`);
+        })
+        .catch(() => {
+          setCodeInput(clean);
+          setShowCodeInput(true);
+        });
+    }
+  }, [searchParams, loadCaseByCode, navigate]);
 
   const handleCreateNew = () => {
     clearWizardDraft();
