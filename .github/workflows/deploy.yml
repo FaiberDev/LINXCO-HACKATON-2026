@@ -19,6 +19,7 @@ jobs:
           if [ -f /home/ubuntu/linxco.env ]; then
             echo "Cargando variables de entorno desde /home/ubuntu/linxco.env..."
             cp /home/ubuntu/linxco.env ./LINXCO-HACKATON/.env
+            cp /home/ubuntu/linxco.env ./.env
           fi
           docker compose down --remove-orphans || true
           docker compose up -d --build
