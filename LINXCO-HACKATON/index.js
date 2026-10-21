@@ -1249,6 +1249,43 @@ app.get('/api/arbol-decision', (req, res) => {
   }
 });
 
+const { botManager } = require('./services/whatsappBotManager');
+
+// ---- Rutas de Control de Encendido/Apagado del Bot de WhatsApp ----
+app.get('/api/bot/status', (req, res) => {
+  res.json({ success: true, ...botManager.getStatus() });
+});
+
+app.post('/api/bot/start', async (req, res) => {
+  try {
+    const status = await botManager.start({
+      getOrCreateUsuario,
+      procesarMensaje,
+    });
+    res.json({ success: true, mensaje: 'Iniciando bot de WhatsApp', ...status });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/bot/stop', async (req, res) => {
+  try {
+    const status = await botManager.stop();
+    res.json({ success: true, mensaje: 'Bot de WhatsApp detenido', ...status });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/bot/logout', async (req, res) => {
+  try {
+    const status = await botManager.logout();
+    res.json({ success: true, mensaje: 'Sesión de WhatsApp cerrada y credenciales eliminadas', ...status });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/bot/mensaje', async (req, res) => {
   try {
     const { telefono = '+573001112233', texto = '', arbol_config = null } = req.body || {};
@@ -1284,6 +1321,7 @@ module.exports = {
   ESTADOS_VALIDOS,
   Solicitud,
   generarDocumentoDesdePlantilla,
+  botManager,
 };
 
 if (require.main === module) {

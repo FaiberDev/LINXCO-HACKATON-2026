@@ -1,0 +1,25 @@
+name: Deploy Linxco on Self-Hosted EC2
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy with Docker Compose
+        run: |
+          echo "Desplegando Linxco (Justicia para Todos) en EC2 con Docker Compose..."
+          if [ -f /home/ubuntu/linxco.env ]; then
+            echo "Cargando variables de entorno desde /home/ubuntu/linxco.env..."
+            cp /home/ubuntu/linxco.env ./LINXCO-HACKATON/.env
+          fi
+          docker compose down --remove-orphans || true
+          docker compose up -d --build
+          echo "¡Despliegue completado con éxito!"

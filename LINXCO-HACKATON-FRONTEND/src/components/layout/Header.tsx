@@ -9,6 +9,7 @@ import {
   Gauge,
   SignOut,
   X,
+  WhatsappLogo,
 } from '@phosphor-icons/react';
 
 export const Header: React.FC = () => {
@@ -100,6 +101,15 @@ export const Header: React.FC = () => {
               </button>
             </div>
           )}
+
+          <Link
+            to="/bot"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-xs font-black border border-emerald-400 transition"
+            title="Panel del Bot de WhatsApp"
+          >
+            <WhatsappLogo weight="duotone" className="w-4 h-4 text-emerald-700" />
+            <span className="hidden sm:inline">Bot WhatsApp</span>
+          </Link>
 
           {user ? (
             <div className="flex items-center gap-2">

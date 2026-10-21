@@ -14,6 +14,7 @@ import { WizardView } from './views/WizardView';
 import { CaseStatusView } from './views/CaseStatusView';
 import { LearnRightsView } from './views/LearnRightsView';
 import { LegalClinicView } from './views/LegalClinicView';
+import { WhatsAppBotControlView } from './views/WhatsAppBotControlView';
 
 // Admin & Auth Views (RBAC Separado Físicamente)
 import { LoginView } from './views/LoginView';
@@ -39,6 +40,8 @@ export const AppContent: React.FC = () => {
           <Route path="/estado/:codigo" element={<CaseStatusView />} />
           <Route path="/aprender" element={<LearnRightsView />} />
           <Route path="/asesor" element={<LegalClinicView />} />
+          <Route path="/bot" element={<WhatsAppBotControlView />} />
+          <Route path="/admin/bot" element={<WhatsAppBotControlView />} />
 
           {/* Autenticación Institucional */}
           <Route path="/login" element={<LoginView />} />

@@ -1,0 +1,42 @@
+services:
+  backend:
+    build:
+      context: ./LINXCO-HACKATON
+      dockerfile: Dockerfile
+    container_name: linxco-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: ./LINXCO-HACKATON/.env
+        required: false
+      - path: .env
+        required: false
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER:-}
+      - AUTO_START_WSP_BOT=${AUTO_START_WSP_BOT:-false}
+    volumes:
+      - wsp_session:/app/auth_info_baileys
+      - generated_docs:/app/documentos_generados
+
+  frontend:
+    build:
+      context: ./LINXCO-HACKATON-FRONTEND
+      dockerfile: Dockerfile
+    container_name: linxco-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  wsp_session:
+  generated_docs:

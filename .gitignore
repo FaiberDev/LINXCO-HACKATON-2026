@@ -12,6 +12,7 @@ originals-assets/
 **/.env.*
 !**/.env.example
 **/auth_info_baileys/
+**/*.pem
 
 # Generated runtime documents & agent artifacts
 **/.agents/
