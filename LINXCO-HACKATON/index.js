@@ -1286,6 +1286,18 @@ app.post('/api/bot/logout', async (req, res) => {
   }
 });
 
+app.post('/api/bot/reset', async (req, res) => {
+  try {
+    const status = await botManager.reset({
+      getOrCreateUsuario,
+      procesarMensaje,
+    });
+    res.json({ success: true, mensaje: 'Sesión reseteada y generando nuevo código QR', ...status });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/bot/mensaje', async (req, res) => {
   try {
     const { telefono = '+573001112233', texto = '', arbol_config = null } = req.body || {};
