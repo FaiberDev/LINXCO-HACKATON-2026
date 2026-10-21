@@ -1,6 +1,7 @@
 # Ignore unrelated folders in workspace
 amazon-survival/
 mars-survival-short/
+originals-assets/
 
 # Dependencies & build output
 **/node_modules/

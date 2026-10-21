@@ -1,5 +1,4 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
 
 interface MobileContainerProps {
   children: React.ReactNode;
@@ -10,15 +9,10 @@ export const MobileContainer: React.FC<MobileContainerProps> = ({
   children,
   className = '',
 }) => {
-  const location = useLocation();
-  const isAdminPanel = location.pathname.startsWith('/admin');
-
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex justify-center">
+    <div className="min-h-screen w-full bg-[#F8FAF6] text-charcoal-900 flex flex-col">
       <div
-        className={`w-full ${
-          isAdminPanel ? 'max-w-4xl' : 'max-w-md'
-        } min-h-screen bg-white px-4 pb-20 shadow-md border-x border-slate-200 flex flex-col transition-all ${className}`}
+        className={`w-full max-w-[1840px] mx-auto min-h-screen px-4 sm:px-8 lg:px-14 2xl:px-20 pb-12 flex flex-col ${className}`}
       >
         {children}
       </div>

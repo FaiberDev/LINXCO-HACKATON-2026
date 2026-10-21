@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { CaseProvider } from '../context/CaseContext';
+import { AuthProvider, AUTH_STORAGE_KEY } from '../context/AuthContext';
 import { LandingPage } from '../views/LandingPage';
 import { ContinuationPortal } from '../views/ContinuationPortal';
 import { CaseStatusView } from '../views/CaseStatusView';
@@ -168,8 +169,8 @@ describe('App Views & Route Shells Verification', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByText(/Paso 1 de 6/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Siguiente/i })).toBeInTheDocument();
+      expect(screen.getByText(/Nivel 1: Categoría Principal/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /A\. Salud/i })).toBeInTheDocument();
     });
   });
 
@@ -188,6 +189,57 @@ describe('App Views & Route Shells Verification', () => {
       expect(screen.getByText('Justicia para todos')).toBeInTheDocument();
       expect(screen.getByText('Justicia en tu Vereda')).toBeInTheDocument();
       expect(screen.getByText('CASO-XYZ')).toBeInTheDocument();
+    });
+
+    it('Header allows citizen to dismiss active case code with close button', () => {
+      localStorage.setItem('justicia_active_code', 'CASO-XYZ');
+
+      render(
+        <MemoryRouter>
+          <AuthProvider>
+            <CaseProvider>
+              <Header />
+            </CaseProvider>
+          </AuthProvider>
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText('CASO-XYZ')).toBeInTheDocument();
+      const dismissBtn = screen.getByRole('button', { name: /Quitar código activo/i });
+      fireEvent.click(dismissBtn);
+
+      expect(screen.queryByText('CASO-XYZ')).not.toBeInTheDocument();
+      expect(localStorage.getItem('justicia_active_code')).toBeNull();
+    });
+
+    it('Header does not display active case code when an admin is logged in', () => {
+      localStorage.setItem('justicia_active_code', 'CASO-SMK');
+      localStorage.setItem(
+        AUTH_STORAGE_KEY,
+        JSON.stringify({
+          user: {
+            id: 'admin-1',
+            nombre_completo: 'Dr. Carlos Mendoza',
+            rol: 'Jefe de Consultorio',
+            numero_documento: '1000100100',
+          },
+          token: 'jwt-admin',
+        })
+      );
+
+      render(
+        <MemoryRouter>
+          <AuthProvider>
+            <CaseProvider>
+              <Header />
+            </CaseProvider>
+          </AuthProvider>
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText(/Mi Panel \(Jefe\)/i)).toBeInTheDocument();
+      expect(screen.queryByText('CASO-SMK')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Código activo:/i)).not.toBeInTheDocument();
     });
 
     it('Footer displays institutional links and service status', () => {

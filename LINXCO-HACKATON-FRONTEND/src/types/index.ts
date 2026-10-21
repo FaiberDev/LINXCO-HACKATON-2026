@@ -20,6 +20,8 @@ export type Mecanismo =
   | string;
 
 export interface CiudadanoData {
+  nombres?: string;
+  apellidos?: string;
   nombre_completo?: string;
   tipo_documento?: string;
   numero_documento?: string;

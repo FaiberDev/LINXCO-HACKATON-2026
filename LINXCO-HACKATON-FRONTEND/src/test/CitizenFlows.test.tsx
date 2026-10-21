@@ -2,38 +2,63 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { CaseProvider } from '../context/CaseContext';
+import { AuthProvider, AUTH_STORAGE_KEY } from '../context/AuthContext';
+import { ProtectedRoute, RoleRouterController } from '../components/auth/ProtectedRoute';
 import { LandingPage } from '../views/LandingPage';
 import { ContinuationPortal } from '../views/ContinuationPortal';
 import { WizardView } from '../views/WizardView';
 import { CaseStatusView } from '../views/CaseStatusView';
 import { LegalClinicView } from '../views/LegalClinicView';
+import { LoginView } from '../views/LoginView';
+import { JefeDashboardView } from '../views/JefeDashboardView';
+import { AsesorDashboardView } from '../views/AsesorDashboardView';
 import * as api from '../services/api';
 
-describe('Tier 4: Real-World Rural Citizen Journeys & Combinatorial Flows', () => {
+describe('Tier 4: Real-World Rural Citizen Journeys & RBAC Security Flows', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     vi.restoreAllMocks();
   });
 
   const renderAppFlow = (initialEntry = '/') => {
     return render(
       <MemoryRouter initialEntries={[initialEntry]}>
-        <CaseProvider>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/portal" element={<ContinuationPortal />} />
-            <Route path="/wizard" element={<WizardView />} />
-            <Route path="/estado" element={<CaseStatusView />} />
-            <Route path="/estado/:codigo" element={<CaseStatusView />} />
-            <Route path="/asesor" element={<LegalClinicView />} />
-          </Routes>
-        </CaseProvider>
+        <AuthProvider>
+          <CaseProvider>
+            <Routes>
+              <Route path="/dashboard" element={<RoleRouterController />} />
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/portal" element={<ContinuationPortal />} />
+              <Route path="/wizard" element={<WizardView />} />
+              <Route path="/estado" element={<CaseStatusView />} />
+              <Route path="/estado/:codigo" element={<CaseStatusView />} />
+              <Route path="/asesor" element={<LegalClinicView />} />
+              <Route path="/login" element={<LoginView />} />
+              <Route
+                path="/admin/jefe"
+                element={
+                  <ProtectedRoute allowedRole="Jefe de Consultorio">
+                    <JefeDashboardView />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/asesor"
+                element={
+                  <ProtectedRoute allowedRole="Asesor Jurídico">
+                    <AsesorDashboardView />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </CaseProvider>
+        </AuthProvider>
       </MemoryRouter>
     );
   };
 
-  it('Scenario 1 (Salud): Continues WhatsApp code CASO-SJH, completes Tutela wizard, updates case', async () => {
-    // 1. Mock backend response for initial WhatsApp case lookup
+  it('Scenario 1 (Salud): Continues WhatsApp code CASO-SJH, completes Tutela wizard with split Name & Municipality autocomplete', async () => {
     vi.spyOn(api, 'apiFetch').mockImplementation(async (url, options) => {
       if (url === '/casos/CASO-SJH' && (!options || options.method === 'GET')) {
         return {
@@ -52,16 +77,11 @@ describe('Tier 4: Real-World Rural Citizen Journeys & Combinatorial Flows', () =
           },
         };
       }
-      if (url === '/casos/CASO-SJH' && options?.method === 'PUT') {
+      if (url === '/generar-documento' && options?.method === 'POST') {
         return {
           success: true,
-          data: {
-            id: 'uuid-sjh',
-            codigo_sms: 'CASO-SJH',
-            tipo_problema: 'Acción de tutela (SALUD: Trámite web)',
-            estado: 'VALIDADO',
-            formulario_web: JSON.parse((options.body as string) || '{}'),
-          },
+          codigo: 'CASO-SJH',
+          ruta_documento: '/api/documentos/CASO-SJH.docx',
         };
       }
       return { success: true, data: {} };
@@ -75,166 +95,112 @@ describe('Tier 4: Real-World Rural Citizen Journeys & Combinatorial Flows', () =
     fireEvent.change(codeInput, { target: { value: 'CASO-SJH' } });
     fireEvent.click(screen.getByRole('button', { name: /Consultar trámite/i }));
 
-    // Step 2: Redirects to Wizard because status is BORRADOR
+    // Arrives at Estado de tu trámite view, then citizen clicks "Continuar editando solicitud"
     await waitFor(() => {
-      expect(screen.getByText(/Paso 1 de 6/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Continuar editando solicitud/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Continuar editando solicitud/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Nivel 1: Categoría Principal/i)).toBeInTheDocument();
     });
 
-    // Advance through Wizard steps
-    // Step 1 -> Next
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    // Seleccionar A. Salud -> Tutela Medicamentos
+    fireEvent.click(screen.getByRole('button', { name: /A\. Salud/i }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /No me entregan medicamentos urgentes/i })
+    );
 
-    // Step 2: Citizen info
-    expect(screen.getByText(/Paso 2 de 6/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Nombre completo \*/i), {
-      target: { value: 'María Rodríguez' },
+    // Variable 1: Nombre(s) y Apellido(s)
+    fireEvent.change(screen.getByLabelText(/Nombre\(s\) \*/i), {
+      target: { value: 'María' },
     });
-    fireEvent.change(screen.getByLabelText(/Número doc\. \*/i), {
+    fireEvent.change(screen.getByLabelText(/Apellido\(s\) \*/i), {
+      target: { value: 'Rodríguez' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
+
+    // Variable 2: Documento
+    fireEvent.change(screen.getByLabelText(/¿Cuál es tu número de cédula\?/i), {
       target: { value: '34567890' },
     });
-    fireEvent.change(screen.getByLabelText(/Teléfono \/ WhatsApp \*/i), {
-      target: { value: '3109876543' },
-    });
-    fireEvent.change(screen.getByLabelText(/Municipio/i), {
-      target: { value: 'Popayán' },
-    });
-    fireEvent.change(screen.getByLabelText(/Vereda \/ Sector/i), {
-      target: { value: 'El Sendero' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
 
-    // Step 3: Entity
-    expect(screen.getByText(/Paso 3 de 6/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Nombre de la entidad o autoridad \*/i), {
-      target: { value: 'Nueva EPS' },
+    // Variable 3: EPS
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva EPS' }));
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
+
+    // Variable 4: Diagnóstico
+    fireEvent.change(screen.getByLabelText(/¿Cuál es el diagnóstico médico exacto\?/i), {
+      target: { value: 'Hipertensión arterial crónica' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
 
-    // Step 4: Facts
-    expect(screen.getByText(/Paso 4 de 6/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Descripción de los hechos \*/i), {
-      target: {
-        value: 'Desde hace 3 meses el médico me formuló Losartán y la EPS no lo entrega.',
-      },
+    // Variable 5: Medicamento
+    fireEvent.change(
+      screen.getByLabelText(/¿Qué medicamento urgente y dosis te negaron\?/i),
+      { target: { value: 'Losartán 50mg' } }
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
+
+    // Variable 6: Municipio (Autocompletado) y Vereda
+    fireEvent.change(screen.getByLabelText(/Municipio \(DANE\) \*/i), {
+      target: { value: 'Popayán, Cauca' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    fireEvent.change(
+      screen.getByLabelText(/Vereda, Corregimiento o Dirección \*/i),
+      { target: { value: 'Vereda El Sendero' } }
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Revisar datos/i }));
 
-    // Step 5: Petition
-    expect(screen.getByText(/Paso 5 de 6/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Petición concreta \/ Pretensión \*/i), {
-      target: {
-        value: 'Ordenar a Nueva EPS la entrega inmediata de los medicamentos requeridos.',
-      },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    // Confirmar y generar documento
+    fireEvent.click(screen.getByRole('button', { name: /Generar Documento/i }));
 
-    // Step 6: Summary & Submit
-    expect(screen.getByText(/Paso 6 de 6/i)).toBeInTheDocument();
-    expect(screen.getByText(/María Rodríguez/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Nueva EPS/i).length).toBeGreaterThanOrEqual(1);
-
-    fireEvent.click(screen.getByRole('button', { name: /Enviar solicitud/i }));
-
-    // Confirmation shows code CASO-SJH
     await waitFor(() => {
-      expect(screen.getByText('¡Trámite radicado exitosamente!')).toBeInTheDocument();
+      expect(
+        screen.getByText('¡Documento legal generado con éxito!')
+      ).toBeInTheDocument();
       expect(screen.getByText('CASO-SJH')).toBeInTheDocument();
     });
+  });
 
-    // Navigate to status view
-    fireEvent.click(screen.getByRole('button', { name: /Ver estado y progreso del trámite/i }));
+  it('Scenario 2 (Logout & RBAC): Clears storage on logout and blocks returning to protected routes', async () => {
+    // Simular sesión activa de Jefe de Consultorio
+    const jefeSession = {
+      user: {
+        id: '4481df48-b9ca-40ef-8529-be92c2075850',
+        numero_documento: '1000100100',
+        nombre_completo: 'Dr. Carlos Mendoza (Jefe de Consultorio)',
+        rol: 'Jefe de Consultorio',
+      },
+      token: 'token-jefe-123',
+    };
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(jefeSession));
 
+    renderAppFlow('/dashboard');
+
+    // RoleRouterController redirige automáticamente a /admin/jefe
     await waitFor(() => {
-      expect(screen.getByText('Estado de tu trámite')).toBeInTheDocument();
-      expect(screen.getByText('VALIDADO')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Panel del Jefe de Consultorio Jurídico/i)
+      ).toBeInTheDocument();
+    });
+
+    // Cerrar sesión con el botón Salir
+    const btnSalir = screen.getByRole('button', { name: /^Salir$/i });
+    fireEvent.click(btnSalir);
+
+    // Verifica que limpió LocalStorage y SessionStorage y redirigió a /login con replace
+    await waitFor(() => {
+      expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+      expect(sessionStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+      expect(
+        screen.getByText(/Portal de Consultorio Jurídico/i)
+      ).toBeInTheDocument();
     });
   });
 
-  it('Scenario 2 (Educación): Starts from landing, creates new Derecho de Petición case', async () => {
-    vi.spyOn(api, 'apiFetch').mockResolvedValue({
-      success: true,
-      data: {
-        id: 'uuid-edu-1',
-        codigo_sms: 'CASO-K7W',
-        tipo_problema: 'Derecho de petición (EDUCACION: Faltan profesores)',
-        estado: 'VALIDADO',
-        formulario_web: {
-          mecanismo: 'Derecho de petición',
-          categoria: 'EDUCACION',
-        },
-        created_at: new Date().toISOString(),
-      },
-    });
-
-    renderAppFlow('/');
-
-    // Landing -> "Protege tus derechos"
-    fireEvent.click(screen.getByRole('button', { name: /Protege tus derechos/i }));
-
-    // Portal -> "Crear nueva solicitud"
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Crear nueva solicitud/i })).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Crear nueva solicitud/i }));
-
-    // Wizard Step 1: Mechanism & Category
-    await waitFor(() => {
-      expect(screen.getByText(/Paso 1 de 6/i)).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Derecho de petición' }));
-    fireEvent.click(screen.getByRole('button', { name: /Educación y escuela/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Step 2: Citizen
-    fireEvent.change(screen.getByLabelText(/Nombre completo \*/i), {
-      target: { value: 'Carlos Gómez' },
-    });
-    fireEvent.change(screen.getByLabelText(/Número doc\. \*/i), {
-      target: { value: '1053456789' },
-    });
-    fireEvent.change(screen.getByLabelText(/Teléfono \/ WhatsApp \*/i), {
-      target: { value: '3201234567' },
-    });
-    fireEvent.change(screen.getByLabelText(/Municipio/i), {
-      target: { value: 'Fusagasugá' },
-    });
-    fireEvent.change(screen.getByLabelText(/Vereda \/ Sector/i), {
-      target: { value: 'La Aguadita' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Step 3: Entity
-    fireEvent.change(screen.getByLabelText(/Nombre de la entidad o autoridad \*/i), {
-      target: { value: 'Secretaría de Educación Municipal' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Step 4: Facts
-    fireEvent.change(screen.getByLabelText(/Descripción de los hechos \*/i), {
-      target: {
-        value: 'En la escuela rural de la vereda faltan dos profesores desde febrero.',
-      },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Step 5: Petition
-    fireEvent.change(screen.getByLabelText(/Petición concreta \/ Pretensión \*/i), {
-      target: {
-        value: 'Solicito el nombramiento inmediato de los docentes de primaria.',
-      },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Step 6: Submit
-    fireEvent.click(screen.getByRole('button', { name: /Enviar solicitud/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText('¡Trámite radicado exitosamente!')).toBeInTheDocument();
-      expect(screen.getByText('CASO-K7W')).toBeInTheDocument();
-    });
-  });
-
-  it('Scenario 3 (Consultorio Jurídico): Submits legal clinic request from landing', async () => {
+  it('Scenario 3 (Consultorio Jurídico): Submits legal clinic request from landing with split Name/Last Name and Municipality autocomplete', async () => {
     vi.spyOn(api, 'apiFetch').mockResolvedValue({
       success: true,
       data: {
@@ -258,15 +224,18 @@ describe('Tier 4: Real-World Rural Citizen Journeys & Combinatorial Flows', () =
       expect(screen.getByText('Habla con un asesor')).toBeInTheDocument();
     });
 
-    // Fill form
+    // Fill form (both Nombre(s) and Apellido(s) are present)
     fireEvent.change(screen.getByLabelText(/Nombre completo \*/i), {
-      target: { value: 'Ana Lucía Hurtado' },
+      target: { value: 'Ana Lucía' },
+    });
+    fireEvent.change(screen.getByLabelText(/Apellido\(s\) \*/i), {
+      target: { value: 'Hurtado' },
     });
     fireEvent.change(screen.getByLabelText(/Teléfono de contacto \/ WhatsApp \*/i), {
       target: { value: '3145678901' },
     });
     fireEvent.change(screen.getByLabelText(/Municipio \*/i), {
-      target: { value: 'Pasto' },
+      target: { value: 'Pasto, Nariño' },
     });
     fireEvent.change(screen.getByLabelText(/Vereda o sector/i), {
       target: { value: 'San Isidro' },

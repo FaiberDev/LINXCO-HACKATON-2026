@@ -423,4 +423,38 @@ describe('Linxco Backend REST API & Modules', () => {
       assert.ok(xml.includes('<Message>'));
     });
   });
+
+  describe('Document Generation & Elimination of ANEXOS Section', () => {
+    const fs = require('fs');
+    const PizZip = require('pizzip');
+    const { generarDocumentoDesdePlantilla } = require('../services/templateService.js');
+
+    it('should eliminate ANEXOS section and inject separate EDAD_MENOR and GRADO_ESCOLAR_SOLICITADO', () => {
+      const res = generarDocumentoDesdePlantilla({
+        codigo: 'CASO-EDG',
+        datosCiudadano: {
+          NOMBRE_ACCIONANTE: 'Patricia Caicedo',
+          NUMERO_DOCUMENTO_ACCIONANTE: '31888777',
+          NOMBRE_MENOR: 'Sebastián Morales',
+          EDAD_MENOR: '9',
+          GRADO_ESCOLAR_SOLICITADO: 'Cuarto (4°)',
+          ENTIDAD_RECEPTORA_SOLICITUD: 'Secretaría de Educación',
+          VEREDA_CORREGIMIENTO_O_BARRIO: 'Vereda Lomitas',
+        },
+        plantilla: 'TUTELA CUPO COLEGIO.docx',
+      });
+
+      assert.ok(fs.existsSync(res.filePath));
+      const zip = new PizZip(fs.readFileSync(res.filePath));
+      const xml = zip.file('word/document.xml').asText();
+      const text = xml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+      // Should have injected the specific age and grade variables
+      assert.ok(text.includes('9 años'));
+      assert.ok(text.includes('Cuarto (4°)'));
+
+      // Should have eliminated the ANEXOS section
+      assert.strictEqual(/(?:PRUEBAS Y ANEXOS|ANEXOS Y PRUEBAS|\bANEXOS\b)/i.test(text), false);
+    });
+  });
 });

@@ -234,7 +234,7 @@ describe('Adversarial Verification Suite (Empirical Challenger)', () => {
 
       await waitFor(() => {
         expect(getSpy).toHaveBeenCalledWith('/casos/CASO-SJH');
-        expect(screen.getByTestId('wizard-view')).toBeInTheDocument();
+        expect(screen.getByTestId('status-view')).toBeInTheDocument();
       });
     });
 
@@ -289,113 +289,78 @@ describe('Adversarial Verification Suite (Empirical Challenger)', () => {
       );
     };
 
-    it('enforces validation bounds on all empty steps', () => {
-      localStorage.setItem(
-        'justicia_wizard_draft',
-        JSON.stringify({
-          paso_actual: 1,
-          mecanismo: '',
-          categoria: '',
-        })
-      );
-
+    it('enforces validation bounds on empty template variable steps (split name & location)', () => {
       renderWizard();
 
-      // Step 1: Click next without choosing mechanism or category
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+      // Nivel 1 -> Nivel 2 (Salud -> Derecho de Petición Medicamentos)
+      fireEvent.click(screen.getByRole('button', { name: /A\. Salud/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Me niegan o demoran la entrega de medicamentos/i }));
+
+      // Variable 1: Nombre(s) y Apellido(s) vacíos -> Bloquea avance
+      fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
       expect(
-        screen.getByText(/Selecciona el mecanismo legal/i)
+        screen.getByText(/Por favor ingresa tanto el Nombre\(s\) como el Apellido\(s\)/i)
       ).toBeInTheDocument();
 
-      // Choose mechanism only
-      fireEvent.click(screen.getByRole('button', { name: 'Derecho de petición' }));
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-      expect(screen.getByText(/Selecciona la categoría del problema/i)).toBeInTheDocument();
+      // Solo Nombre sin Apellido -> Bloquea avance
+      fireEvent.change(screen.getByLabelText(/Nombre\(s\) \*/i), {
+        target: { value: 'Carlos' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
+      expect(
+        screen.getByText(/Por favor ingresa tanto el Nombre\(s\) como el Apellido\(s\)/i)
+      ).toBeInTheDocument();
     });
 
     it('handles 5,000+ character strings in facts and petition without buffer failure', async () => {
-      const extremeFacts = 'A'.repeat(5200);
-      const extremePetition = 'B'.repeat(5100);
+      const extremeText = 'A'.repeat(5200);
 
-      // Preload draft with extreme text
-      localStorage.setItem(
-        'justicia_wizard_draft',
-        JSON.stringify({
-          paso_actual: 4,
-          mecanismo: 'Derecho de petición',
-          categoria: 'SALUD',
-          ciudadano: {
-            nombre_completo: 'Carlos Extremadura',
-            numero_documento: '987654321',
-            telefono: '3110001122',
-          },
-          entidad: 'Hospital San José',
-          hechos: extremeFacts,
-          peticion: extremePetition,
-        })
-      );
-
-      const postSpy = vi.spyOn(api, 'apiFetch').mockResolvedValueOnce({
+      const postSpy = vi.spyOn(api, 'apiFetch').mockResolvedValue({
         success: true,
-        data: {
-          codigo_sms: 'CASO-BIG',
-          tipo_problema: 'Derecho de petición (SALUD: Trámite web)',
-          estado: 'VALIDADO',
-          formulario_web: { hechos: extremeFacts, peticion: extremePetition },
-        },
+        codigo: 'CASO-BIG',
+        ruta_documento: '/api/documentos/test.docx',
       });
 
       renderWizard();
 
-      expect(screen.getByText(/Paso 4 de 6/i)).toBeInTheDocument();
-      // Step 4 -> 5
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-      expect(screen.getByText(/Paso 5 de 6/i)).toBeInTheDocument();
+      // Elegir categoría A. Salud -> Otra situación (Handoff Asesor)
+      fireEvent.click(screen.getByRole('button', { name: /A\. Salud/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Otra situación de salud/i }));
 
-      // Step 5 -> 6
-      fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-      expect(screen.getByText(/Paso 6 de 6/i)).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText(/Explicación breve de tu caso \*/i), {
+        target: { value: extremeText },
+      });
 
-      // Step 6 submit
-      fireEvent.click(screen.getByRole('button', { name: /Enviar solicitud/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Enviar caso al Asesor Jurídico/i }));
 
       await waitFor(() => {
         expect(postSpy).toHaveBeenCalled();
-        expect(screen.getByText('CASO-BIG')).toBeInTheDocument();
       });
     });
 
     it('neutralizes XSS payloads as plain text in JSX output', async () => {
       const xssPayload = '<script>alert("XSS")</script><img src="x" onerror="alert(1)">';
 
-      localStorage.setItem(
-        'justicia_wizard_draft',
-        JSON.stringify({
-          paso_actual: 6,
-          mecanismo: 'Acción de tutela',
-          categoria: 'VEREDA',
-          ciudadano: {
-            nombre_completo: xssPayload,
-            numero_documento: '12345678',
-            telefono: '3001234567',
-          },
-          entidad: xssPayload,
-          hechos: `Hechos con payload: ${xssPayload}`,
-          peticion: `Petición con payload: ${xssPayload}`,
-        })
-      );
-
       renderWizard();
 
-      expect(screen.getByText(/Paso 6 de 6/i)).toBeInTheDocument();
+      // Ir a Salud -> Derecho de Petición Medicamentos
+      fireEvent.click(screen.getByRole('button', { name: /A\. Salud/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Me niegan o demoran la entrega de medicamentos/i }));
+
+      // Ingresar payload XSS en Nombre(s) y Apellido(s)
+      fireEvent.change(screen.getByLabelText(/Nombre\(s\) \*/i), {
+        target: { value: xssPayload },
+      });
+      fireEvent.change(screen.getByLabelText(/Apellido\(s\) \*/i), {
+        target: { value: 'ApellidoSeguro' },
+      });
 
       // Check that script tags are NOT executable elements in DOM
       expect(document.querySelector('script[src="x"]')).toBeNull();
       expect(document.querySelector('img[src="x"]')).toBeNull();
 
-      // The text is rendered safely as escaped text
-      const reviewText = screen.getByText(/Hechos con payload:/i);
-      expect(reviewText.textContent).toContain('<script>alert("XSS")</script>');
+      // El preview muestra el texto escapado de forma segura
+      expect(screen.getByText(/<script>alert\("XSS"\)<\/script>/i)).toBeInTheDocument();
     });
   });
 

@@ -1,0 +1,199 @@
+{
+  "categorias": [
+    {
+      "id": "salud",
+      "letra": "A",
+      "titulo": "Salud",
+      "subcategorias": [
+        {
+          "id": "dp_medicamentos",
+          "descripcion": "Me niegan o demoran la entrega de medicamentos (Derecho de Petición)",
+          "plantilla": "Plantilla Derecho de Petición Medicamentos Colombia.docx",
+          "mecanismo": "Derecho de petición",
+          "variables_requeridas": [
+            { "id": "NOMBRE_COMPLETO_PACIENTE_USUARIO", "pregunta": "Por favor escribe tu *nombre completo*:" },
+            { "id": "NUMERO_CEDULA", "pregunta": "¿Cuál es tu *número de cédula o documento de identidad*?" },
+            { "id": "NOMBRE_EPS", "pregunta": "¿A qué *EPS o IPS* estás afiliado(a) y va dirigido el reclamo?" },
+            { "id": "DIAGNOSTICO_MEDICO_O_ENFERMEDAD", "pregunta": "¿Cuál es tu *diagnóstico médico o enfermedad*?" },
+            { "id": "NOMBRE_MEDICAMENTO_1", "pregunta": "¿Qué *medicamento(s)* te formularon y están pendientes de entrega?" },
+            { "id": "CIUDAD_O_MUNICIPIO_RADICACION", "pregunta": "¿En qué *municipio y vereda/barrio* vives?" }
+          ]
+        },
+        {
+          "id": "tutela_medicamentos",
+          "descripcion": "No me entregan medicamentos urgentes y mi salud está en riesgo (Acción de Tutela)",
+          "plantilla": "Plantilla Accion de Tutela Medicamentos Colombia.docx",
+          "mecanismo": "Acción de tutela",
+          "variables_requeridas": [
+            { "id": "NOMBRE_ACCIONANTE", "pregunta": "Por favor escribe tu *nombre completo*:" },
+            { "id": "NUMERO_CEDULA", "pregunta": "¿Cuál es tu *número de cédula*?" },
+            { "id": "NOMBRE_EPS", "pregunta": "¿Cuál es el nombre de la *EPS accionada*?" },
+            { "id": "DIAGNOSTICO_MEDICO", "pregunta": "¿Cuál es el *diagnóstico médico* exacto?" },
+            { "id": "NOMBRE_MEDICAMENTO", "pregunta": "¿Qué *medicamento urgente y dosis* te negaron?" },
+            { "id": "CIUDAD_O_MUNICIPIO", "pregunta": "¿En qué *municipio y dirección/vereda* resides?" }
+          ]
+        },
+        {
+          "id": "tutela_cirugia",
+          "descripcion": "No me autorizan una cirugía, examen o tratamiento médico vital (Acción de Tutela)",
+          "plantilla": "TUTELA CIRUGIA.docx",
+          "mecanismo": "Acción de tutela",
+          "variables_requeridas": [
+            { "id": "NOMBRE_ACCIONANTE", "pregunta": "Por favor escribe tu *nombre completo*:" },
+            { "id": "NUMERO_DOCUMENTO_ACCIONANTE", "pregunta": "¿Cuál es tu *número de cédula*?" },
+            { "id": "NOMBRE_EPS", "pregunta": "¿A qué *EPS* va dirigida la tutela?" },
+            { "id": "DIAGNOSTICO_MEDICO", "pregunta": "¿Cuál es el *diagnóstico médico*?" },
+            { "id": "NOMBRE_CIRUGIA_O_TRATAMIENTO", "pregunta": "¿Qué *cirugía, examen o tratamiento* ordenó el médico y no han autorizado?" },
+            { "id": "VEREDA_CORREGIMIENTO_O_BARRIO", "pregunta": "¿En qué *vereda, barrio o municipio* resides?" }
+          ]
+        },
+        {
+          "id": "otra_salud",
+          "descripcion": "Otra",
+          "accion": "handoff_asesor"
+        }
+      ]
+    },
+    {
+      "id": "educacion",
+      "letra": "B",
+      "titulo": "Educación",
+      "subcategorias": [
+        {
+          "id": "dp_transporte_escolar",
+          "descripcion": "No tenemos ruta de transporte escolar para los estudiantes de la vereda (Derecho de Petición)",
+          "plantilla": "Plantilla Derecho de Petición Ausencia de Transporte Escolar.docx",
+          "mecanismo": "Derecho de petición",
+          "variables_requeridas": [
+            { "id": "NOMBRE_COMPLETO_PETICIONARIO", "pregunta": "Escribe tu *nombre completo* (padre, madre o acudiente):" },
+            { "id": "NUMERO_CEDULA", "pregunta": "¿Cuál es tu *número de cédula*?" },
+            { "id": "NOMBRE_ESTUDIANTE", "pregunta": "¿Cuál es el *nombre del estudiante* y qué *grado* cursa?" },
+            { "id": "NOMBRE_INSTITUCION_EDUCATIVA", "pregunta": "¿Cómo se llama el *colegio o institución educativa*?" },
+            { "id": "NOMBRE_VEREDA", "pregunta": "¿En qué *vereda y municipio* viven y a qué distancia está el colegio?" }
+          ]
+        },
+        {
+          "id": "tutela_cupo_escolar",
+          "descripcion": "A mi hijo(a) menor de edad le niegan el cupo escolar (Acción de Tutela)",
+          "plantilla": "TUTELA CUPO COLEGIO.docx",
+          "mecanismo": "Acción de tutela",
+          "variables_requeridas": [
+            { "id": "NOMBRE_ACCIONANTE", "pregunta": "Escribe tu *nombre completo* (padre, madre o representante):" },
+            { "id": "NUMERO_DOCUMENTO_ACCIONANTE", "pregunta": "¿Cuál es tu *número de cédula*?" },
+            { "id": "NOMBRE_MENOR", "pregunta": "¿Cuál es el *nombre completo del niño, niña o adolescente*?" },
+            { "id": "EDAD_MENOR", "pregunta": "¿Qué *edad* tiene el niño, niña o adolescente?" },
+            { "id": "GRADO_ESCOLAR_SOLICITADO", "pregunta": "¿Para qué *grado escolar* solicita el cupo?" },
+            { "id": "ENTIDAD_RECEPTORA_SOLICITUD", "pregunta": "¿Ante qué *Secretaría de Educación o Colegio* solicitaste el cupo?" },
+            { "id": "VEREDA_CORREGIMIENTO_O_BARRIO", "pregunta": "¿En qué *vereda o municipio* residen?" }
+          ]
+        },
+        {
+          "id": "otra_educacion",
+          "descripcion": "Otra",
+          "accion": "handoff_asesor"
+        }
+      ]
+    },
+    {
+      "id": "servicios_publicos",
+      "letra": "C",
+      "titulo": "Servicios Públicos",
+      "subcategorias": [
+        {
+          "id": "tutela_agua_potable",
+          "descripcion": "Mi familia o vivienda no cuenta con el mínimo vital de agua potable (Acción de Tutela)",
+          "plantilla": "Plantilla Acción de Tutela Mínimo Vital de Agua Potable (1).docx",
+          "mecanismo": "Acción de tutela",
+          "variables_requeridas": [
+            { "id": "NOMBRE_COMPLETO_ACCIONANTE", "pregunta": "Escribe tu *nombre completo*:" },
+            { "id": "NUMERO_CEDULA", "pregunta": "¿Cuál es tu *número de cédula*?" },
+            { "id": "NOMBRE_EMPRESA_PRESTADORA_ACUEDUCTO", "pregunta": "¿Cuál es la *empresa de acueducto o alcaldía* responsable del servicio?" },
+            { "id": "CAUSA_CORTE_O_FALTA_SERVICIO", "pregunta": "Explica brevemente *desde cuándo no tienen agua potable* y cuántas personas viven en el hogar:" },
+            { "id": "DIRECCION_EXACTA_BARRIO_SECTOR_VEREDA", "pregunta": "¿Cuál es la *vereda, dirección y municipio* de la vivienda afectada?" }
+          ]
+        },
+        {
+          "id": "dp_energia_electrica",
+          "descripcion": "Falta de servicio o cortes prolongados de energía eléctrica en la vereda/sector (Derecho de Petición)",
+          "plantilla": "Plantilla Derecho de Peticion Ausencia de Energia Electrica (Definitiva).docx",
+          "mecanismo": "Derecho de petición",
+          "variables_requeridas": [
+            { "id": "NOMBRE_COMPLETO", "pregunta": "Escribe tu *nombre completo*:" },
+            { "id": "NUMERO_CEDULA", "pregunta": "¿Cuál es tu *número de cédula*?" },
+            { "id": "ENTIDAD_DESTINATARIA", "pregunta": "¿Cuál es la *empresa de energía eléctrica* (ej. Celsia, EPM, Enel, Afinia)?" },
+            { "id": "NUMERO_NIC_CONTRATO", "pregunta": "¿Cuál es el *número de NIC, contrato o cuenta* del recibo (o escribe 'Comunitario')?" },
+            { "id": "FECHA_SUSPENSION_SERVICIO", "pregunta": "¿Desde qué *fecha* están sin energía o con fallas y en qué *vereda/municipio*?" }
+          ]
+        },
+        {
+          "id": "otra_servicios",
+          "descripcion": "Otra",
+          "accion": "handoff_asesor"
+        }
+      ]
+    },
+    {
+      "id": "tierras_vivienda",
+      "letra": "D",
+      "titulo": "Tierras y Vivienda",
+      "subcategorias": [
+        {
+          "id": "dp_titulacion_tierras",
+          "descripcion": "Mi trámite de titulación o adjudicación de predio rural ante la ANT no avanza (Derecho de Petición)",
+          "plantilla": "Plantilla Derecho de Petición Titulación de Tierras ANT.docx",
+          "mecanismo": "Derecho de petición",
+          "variables_requeridas": [
+            { "id": "NOMBRE_COMPLETO_PETICIONARIO", "pregunta": "Escribe tu *nombre completo*:" },
+            { "id": "NUMERO_CEDULA", "pregunta": "¿Cuál es tu *número de cédula*?" },
+            { "id": "NOMBRE_PREDIO_O_FINCA", "pregunta": "¿Cuál es el *nombre del predio o finca*?" },
+            { "id": "NUMERO_EXPEDIENTE_O_FISO", "pregunta": "¿Cuál es el *número de expediente o formulario FISO* (si lo conoces, o escribe 'En consulta')?" },
+            { "id": "NOMBRE_VEREDA", "pregunta": "¿En qué *vereda y municipio* está ubicado el predio?" }
+          ]
+        },
+        {
+          "id": "dp_carretera_veredal",
+          "descripcion": "Deterioro grave de carretera veredal que incomunica mi vivienda o vereda (Derecho de Petición)",
+          "plantilla": "CIUDAD.docx",
+          "mecanismo": "Derecho de petición",
+          "variables_requeridas": [
+            { "id": "NOMBRE_COMPLETO", "pregunta": "Escribe tu *nombre completo*:" },
+            { "id": "NUMERO_DOCUMENTO", "pregunta": "¿Cuál es tu *número de cédula*?" },
+            { "id": "ENTIDAD_DESTINATARIA", "pregunta": "¿A qué *Alcaldía o Secretaría de Infraestructura* diriges la petición?" },
+            { "id": "NOMBRE_VEREDA_CARRETERA", "pregunta": "¿En qué *vereda y municipio* se encuentra el tramo de carretera dañado?" },
+            { "id": "DESCRIPCION_DANOS_CARRETERA", "pregunta": "Describe brevemente los *daños de la vía* y cómo afecta a las familias:" }
+          ]
+        },
+        {
+          "id": "otra_tierras",
+          "descripcion": "Otra",
+          "accion": "handoff_asesor"
+        }
+      ]
+    },
+    {
+      "id": "laboral_consumo",
+      "letra": "E",
+      "titulo": "Laboral o Consumo",
+      "subcategorias": [
+        {
+          "id": "tutela_no_respuesta_peticion",
+          "descripcion": "Presenté un Derecho de Petición o reclamo (laboral, consumo o entidad) y no me han respondido en el plazo de ley (Acción de Tutela)",
+          "plantilla": "Plantilla Acción de Tutela por No Respuesta del Derecho de Petición.docx",
+          "mecanismo": "Acción de tutela",
+          "variables_requeridas": [
+            { "id": "NOMBRE_COMPLETO_ACCIONANTE", "pregunta": "Escribe tu *nombre completo*:" },
+            { "id": "NUMERO_CEDULA", "pregunta": "¿Cuál es tu *número de cédula*?" },
+            { "id": "NOMBRE_COMPLETO_ENTIDAD_O_AUTORIDAD_ACCIONADA", "pregunta": "¿Ante qué *empresa, empleador o entidad* presentaste la petición sin respuesta?" },
+            { "id": "FECHA_RADICACION_DERECHO_PETICION", "pregunta": "¿En qué *fecha* radicaste el Derecho de Petición o reclamo inicial?" },
+            { "id": "RESUMEN_SOLICITUD_DERECHO_PETICION", "pregunta": "¿Qué solicitabas en esa petición y en qué *municipio* te encuentras?" }
+          ]
+        },
+        {
+          "id": "otra_laboral",
+          "descripcion": "Otra",
+          "accion": "handoff_asesor"
+        }
+      ]
+    }
+  ]
+}

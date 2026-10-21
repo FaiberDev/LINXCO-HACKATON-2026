@@ -225,7 +225,7 @@ function construirMensajeOrientacion(infoCategoria) {
 async function getOrCreateUsuario(telefono) {
   const { data, error } = await supabase
     .from('usuarios')
-    .select('id, estado_conversacion, categoria_temporal')
+    .select('id, telefono, estado_conversacion, categoria_temporal')
     .eq('telefono', telefono)
     .maybeSingle();
 
@@ -235,7 +235,7 @@ async function getOrCreateUsuario(telefono) {
   const { data: created, error: insErr } = await supabase
     .from('usuarios')
     .insert({ telefono, estado_conversacion: INICIO, categoria_temporal: null })
-    .select('id, estado_conversacion, categoria_temporal')
+    .select('id, telefono, estado_conversacion, categoria_temporal')
     .single();
 
   if (insErr) throw insErr;
@@ -333,8 +333,38 @@ function esSaludoOInicio(texto) {
   ].includes(norm);
 }
 
-// ---- Máquina de Estados Finita (FSM) ----
-async function procesarMensaje(usuario, texto) {
+const {
+  ESTADOS_FSM,
+  MENSAJE_HANDOFF_OTRA,
+  cargarArbolDecision,
+  procesarMensajeArbolDecision,
+} = require('./services/whatsappStateMachine');
+
+// ---- Máquina de Estados Finita (FSM): Árbol de Decisión de 2 Niveles + Recolección Dinámica ----
+const ESTADOS_LEGACY = new Set([
+  E0,
+  E_APRENDER,
+  E_APRENDER_ACCION,
+  E_TIPO_PROBLEMA,
+  E_PROB_SALUD,
+  E_PROB_EDUCACION,
+  E_PROB_VEREDA,
+  E_CONTINUAR,
+  E_ASESOR_AUTH,
+  E_ASESOR_DATOS,
+  E_FINAL,
+]);
+
+async function procesarMensaje(usuario, texto, customTreeConfig = null) {
+  const estadoActual = usuario.estado_conversacion || INICIO;
+  // Mantiene compatibilidad con pruebas legacy si el usuario fue preconfigurado en ESTADO_0..ESTADO_FINAL
+  if (!customTreeConfig && ESTADOS_LEGACY.has(estadoActual)) {
+    return procesarMensajeLegacy(usuario, texto);
+  }
+  return procesarMensajeArbolDecision(usuario, texto, customTreeConfig);
+}
+
+async function procesarMensajeLegacy(usuario, texto) {
   const estado_actual = usuario.estado_conversacion || INICIO;
   const entrada = (texto || '').trim();
 
@@ -991,11 +1021,6 @@ async function handleCreateSolicitud(req, res) {
         });
         casoCreado = await Solicitud.updateByCodigo(casoCreado.codigo_sms, {
           ruta_documento: docInfo.rutaDocumento,
-          formulario_web: {
-            ...(datosJson || {}),
-            ruta_documento: docInfo.rutaDocumento,
-            plantilla_usada: docInfo.plantillaUsada,
-          },
         });
       } catch (docErr) {
         console.warn('Advertencia generando documento automático en POST:', docErr.message);
@@ -1108,11 +1133,6 @@ async function handleUpdateSolicitud(req, res) {
         });
         actualizado = await Solicitud.updateByCodigo(codigo, {
           ruta_documento: docInfo.rutaDocumento,
-          formulario_web: {
-            ...formObj,
-            ruta_documento: docInfo.rutaDocumento,
-            plantilla_usada: docInfo.plantillaUsada,
-          },
         });
       } catch (docErr) {
         console.warn('Advertencia generando documento en PUT:', docErr.message);
@@ -1220,10 +1240,44 @@ app.post('/api/generar-documento', async (req, res) => {
   }
 });
 
+// ---- API REST: Consultar Árbol de Decisión de 2 Niveles y Simular Bot ----
+app.get('/api/arbol-decision', (req, res) => {
+  try {
+    res.json(cargarArbolDecision());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/bot/mensaje', async (req, res) => {
+  try {
+    const { telefono = '+573001112233', texto = '', arbol_config = null } = req.body || {};
+    const usuario = await getOrCreateUsuario(telefono);
+    const respuesta = await procesarMensajeArbolDecision(usuario, texto, arbol_config);
+    const usuarioActualizado = await getOrCreateUsuario(telefono);
+
+    res.json({
+      success: true,
+      telefono,
+      estado_conversacion: usuarioActualizado.estado_conversacion,
+      respuesta_bot: respuesta,
+      respuestas_automatizadas_detenidas: respuesta === null,
+      documento_generado: usuario.ultimoDocumentoGenerado || null,
+    });
+  } catch (err) {
+    console.error('Error en POST /api/bot/mensaje:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = {
   app,
   getOrCreateUsuario,
   procesarMensaje,
+  procesarMensajeArbolDecision,
+  ESTADOS_FSM,
+  MENSAJE_HANDOFF_OTRA,
+  cargarArbolDecision,
   generarCodigoCaso,
   registrarCaso,
   supabase,

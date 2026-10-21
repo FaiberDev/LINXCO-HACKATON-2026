@@ -13,7 +13,7 @@ export class ApiError extends Error {
 }
 
 export const API_BASE_URL = '/api';
-export const DEFAULT_TIMEOUT_MS = 3000;
+export const DEFAULT_TIMEOUT_MS = 10000;
 
 export async function apiFetch<T>(
   endpoint: string,

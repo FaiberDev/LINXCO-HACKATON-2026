@@ -1,19 +1,30 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../services/api';
 import { Caso, EstadoCaso } from '../types';
 import {
-  Scale,
-  RefreshCw,
-  LogOut,
-  FileDown,
-  FileSpreadsheet,
-  CheckCircle2,
-  AlertCircle,
+  listMockCases,
+  changeMockCaseEstado,
+} from '../services/mockStorage';
+import {
+  Scales,
+  ArrowsClockwise,
+  SignOut,
+  DownloadSimple,
+  FileDoc,
+  CheckCircle,
+  WarningCircle,
   FolderOpen,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react';
+  CaretDown,
+  CaretUp,
+  UserCircle,
+  MapPinLine,
+  Buildings,
+  ClockCountdown,
+  Funnel,
+  Lightning,
+} from '@phosphor-icons/react';
 
 const ESTADOS_GESTION_ASESOR: EstadoCaso[] = [
   'VALIDADO',
@@ -22,18 +33,34 @@ const ESTADOS_GESTION_ASESOR: EstadoCaso[] = [
   'RESPUESTA RECIBIDA',
 ];
 
+const DESCRIPCION_ESTADO_OPERATIVO: Record<EstadoCaso, string> = {
+  BORRADOR: 'Caso recién asignado. Revísalo y márcalo como VALIDADO para iniciar el trámite formal.',
+  VALIDADO: 'Revisión jurídica completada. El ciudadano ya no puede modificar el borrador.',
+  ENVIADO: 'Documento remitido formalmente a la EPS, Alcaldía, empresa o juzgado receptor.',
+  RADICADO: 'Número de radicado oficial confirmado ante la entidad o despacho judicial.',
+  'RESPUESTA RECIBIDA': 'Contestación de fondo o fallo judicial notificado al ciudadano.',
+};
+
 export const AsesorDashboardView: React.FC = () => {
+  const navigate = useNavigate();
   const { user, token, logout } = useAuth();
 
   const [misCasos, setMisCasos] = useState<Caso[]>([]);
+  const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
   const [casoAbiertoId, setCasoAbiertoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [generatingDocId, setGeneratingDocId] = useState<string | null>(null);
+  const [isSimulatingId, setIsSimulatingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+
+  const handleSecureLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   const authHeaders = useCallback((): HeadersInit => {
     const headers: Record<string, string> = {};
@@ -62,13 +89,13 @@ export const AsesorDashboardView: React.FC = () => {
       if (lista.length > 0 && !casoAbiertoId) {
         setCasoAbiertoId(lista[0].id || lista[0].codigo_sms);
       }
-    } catch (err) {
-      setFeedback({
-        type: 'error',
-        message:
-          (err as Error)?.message ||
-          'No se pudieron cargar tus casos asignados.',
-      });
+    } catch {
+      // Fallback local para operación sin servidor backend activo
+      const locales = listMockCases({ asesor_asignado_id: user.id });
+      setMisCasos(locales);
+      if (locales.length > 0 && !casoAbiertoId) {
+        setCasoAbiertoId(locales[0].id || locales[0].codigo_sms);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -107,12 +134,26 @@ export const AsesorDashboardView: React.FC = () => {
           `Estado de ${caso.codigo_sms} actualizado a ${nuevoEstado}.`,
       });
     } catch (err) {
-      setFeedback({
-        type: 'error',
-        message:
-          (err as Error)?.message ||
-          `No se pudo cambiar el estado de ${caso.codigo_sms}.`,
-      });
+      // Fallback local si el servidor no responde
+      const updatedLocal = changeMockCaseEstado(rowKey, nuevoEstado);
+      if (updatedLocal) {
+        setMisCasos((prev) =>
+          prev.map((item) =>
+            (item.id || item.codigo_sms) === rowKey ? updatedLocal : item
+          )
+        );
+        setFeedback({
+          type: 'success',
+          message: `Estado de ${caso.codigo_sms} actualizado a ${nuevoEstado} (sincronizado localmente).`,
+        });
+      } else {
+        setFeedback({
+          type: 'error',
+          message:
+            (err as Error)?.message ||
+            `No se pudo cambiar el estado de ${caso.codigo_sms}.`,
+        });
+      }
     } finally {
       setUpdatingId(null);
     }
@@ -160,40 +201,136 @@ export const AsesorDashboardView: React.FC = () => {
     }
   };
 
+  const handleSimularWorkflow = async (caso: Caso) => {
+    const rowKey = caso.id || caso.codigo_sms;
+    setIsSimulatingId(rowKey);
+    setFeedback({
+      type: 'success',
+      message: `Simulando avance secuencial de etapas oficiales para ${caso.codigo_sms}...`,
+    });
+
+    const steps: EstadoCaso[] = ['VALIDADO', 'ENVIADO', 'RADICADO', 'RESPUESTA RECIBIDA'];
+    const startIdx = steps.indexOf(caso.estado);
+    const remainingSteps = steps.slice(startIdx >= 0 ? startIdx + 1 : 0);
+
+    for (const step of remainingSteps) {
+      await handleCambiarEstado(caso, step);
+      await new Promise((r) => setTimeout(r, 900));
+    }
+
+    setIsSimulatingId(null);
+    setFeedback({
+      type: 'success',
+      message: `🎉 ¡Trámite ${caso.codigo_sms} completado con éxito! Se ha notificado la contestación o fallo final.`,
+    });
+  };
+
+  const metricasAsesor = useMemo(() => {
+    const porRevisar = misCasos.filter((c) => c.estado === 'BORRADOR' || c.estado === 'VALIDADO').length;
+    const enCurso = misCasos.filter((c) => c.estado === 'ENVIADO' || c.estado === 'RADICADO').length;
+    const resueltos = misCasos.filter((c) => c.estado === 'RESPUESTA RECIBIDA').length;
+    return { total: misCasos.length, porRevisar, enCurso, resueltos };
+  }, [misCasos]);
+
+  const casosFiltrados = useMemo(() => {
+    if (filtroEstado === 'TODOS') return misCasos;
+    return misCasos.filter((c) => c.estado === filtroEstado);
+  }, [misCasos, filtroEstado]);
+
   return (
-    <div className="py-5 space-y-5 flex-1">
-      {/* Cabecera del Panel de Asesor Jurídico */}
-      <div className="bg-brand-950 text-white p-5 rounded-2xl border-2 border-slate-900 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-emerald-400 text-slate-950 text-[11px] font-black uppercase">
-            <Scale className="w-3.5 h-3.5" />
+    <div className="py-6 space-y-6 flex-1">
+      {/* Cabecera Institucional del Panel de Asesor Jurídico */}
+      <div className="bg-charcoal-900 text-white p-6 sm:p-8 rounded-3xl border-2 border-charcoal-950 shadow-lg flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-aqua-400 text-charcoal-950 text-xs font-black uppercase tracking-wider">
+            <Scales weight="duotone" className="w-4 h-4" />
             <span>Rol: {user?.rol}</span>
           </div>
-          <h2 className="text-xl font-black">
+          <h2 className="text-2xl sm:text-3xl font-black font-editorial text-white">
             Panel del Asesor Jurídico
           </h2>
-          <p className="text-xs text-slate-200">
-            Bienvenido(a), <strong>{user?.nombre_completo}</strong>. Aquí solo aparecen los casos asignados exclusivamente a ti ({misCasos.length}).
+          <p className="text-xs sm:text-sm text-olive-100 max-w-2xl leading-relaxed">
+            Bienvenido(a), <strong className="text-white">{user?.nombre_completo}</strong>. Aquí gestionas exclusivamente los casos asignados a tu despacho ({misCasos.length}) y controlas su transición de estado legal.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={cargarMisCasos}
-            className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1.5 border border-slate-600"
+            className="min-h-[46px] px-4 py-2.5 rounded-xl bg-charcoal-800 hover:bg-charcoal-700 text-white text-xs font-bold flex items-center gap-2 border border-charcoal-600 transition"
           >
-            <RefreshCw className="w-4 h-4" />
+            <ArrowsClockwise weight="bold" className="w-4 h-4 text-aqua-300" />
             <span>Actualizar</span>
           </button>
           <button
             type="button"
-            onClick={logout}
-            className="px-3.5 py-2.5 rounded-xl bg-red-800 hover:bg-red-900 text-white text-xs font-bold flex items-center gap-1.5 border border-red-950"
+            onClick={handleSecureLogout}
+            className="min-h-[46px] px-4 py-2.5 rounded-xl bg-red-800 hover:bg-red-900 text-white text-xs font-bold flex items-center gap-2 border border-red-950 transition"
           >
-            <LogOut className="w-4 h-4" />
+            <SignOut weight="bold" className="w-4 h-4" />
             <span>Salir</span>
           </button>
+        </div>
+      </div>
+
+      {/* Resumen de Carga de Trabajo del Asesor */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div className="p-4 rounded-2xl bg-white border-2 border-charcoal-800 shadow-sm">
+          <span className="text-[11px] font-mono font-bold uppercase text-charcoal-600 block">
+            Mis Casos Asignados
+          </span>
+          <span className="text-2xl font-black text-charcoal-950 font-editorial mt-1 block">
+            {metricasAsesor.total}
+          </span>
+        </div>
+        <div className="p-4 rounded-2xl bg-olive-50 border-2 border-olive-400 shadow-sm">
+          <span className="text-[11px] font-mono font-bold uppercase text-olive-900 block">
+            En Validación Técnica
+          </span>
+          <span className="text-2xl font-black text-olive-900 font-editorial mt-1 block">
+            {metricasAsesor.porRevisar}
+          </span>
+        </div>
+        <div className="p-4 rounded-2xl bg-institucional-50 border-2 border-institucional-300 shadow-sm">
+          <span className="text-[11px] font-mono font-bold uppercase text-institucional-800 block">
+            Enviados / Radicados
+          </span>
+          <span className="text-2xl font-black text-institucional-800 font-editorial mt-1 block">
+            {metricasAsesor.enCurso}
+          </span>
+        </div>
+        <div className="p-4 rounded-2xl bg-aqua-50 border-2 border-aqua-400 shadow-sm">
+          <span className="text-[11px] font-mono font-bold uppercase text-aqua-900 block">
+            Respuesta Recibida
+          </span>
+          <span className="text-2xl font-black text-aqua-900 font-editorial mt-1 block">
+            {metricasAsesor.resueltos}
+          </span>
+        </div>
+      </div>
+
+      {/* Filtro rápido por Estado */}
+      <div className="flex items-center justify-between gap-3 flex-wrap bg-white p-3.5 rounded-2xl border border-charcoal-200">
+        <div className="flex items-center gap-2 text-xs font-bold text-charcoal-700">
+          <Funnel weight="duotone" className="w-4 h-4 text-institucional-600" />
+          <span>Filtrar mi bandeja por estado:</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {['TODOS', 'BORRADOR', ...ESTADOS_GESTION_ASESOR].map((est) => (
+            <button
+              key={est}
+              type="button"
+              onClick={() => setFiltroEstado(est)}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase transition ${
+                filtroEstado === est
+                  ? 'bg-institucional-500 text-white border border-charcoal-950'
+                  : 'bg-charcoal-100 hover:bg-olive-100 text-charcoal-800'
+              }`}
+            >
+              {est}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -201,16 +338,16 @@ export const AsesorDashboardView: React.FC = () => {
       {feedback && (
         <div
           role="status"
-          className={`p-3.5 rounded-xl border-2 flex items-start gap-2.5 text-xs font-bold ${
+          className={`p-4 rounded-2xl border-2 flex items-start gap-3 text-xs font-bold ${
             feedback.type === 'success'
-              ? 'bg-emerald-50 border-emerald-700 text-emerald-950'
+              ? 'bg-olive-50 border-olive-600 text-charcoal-950'
               : 'bg-red-50 border-red-700 text-red-950'
           }`}
         >
           {feedback.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
+            <CheckCircle weight="duotone" className="w-5 h-5 text-olive-700 shrink-0" />
           ) : (
-            <AlertCircle className="w-5 h-5 text-red-700 shrink-0" />
+            <WarningCircle weight="duotone" className="w-5 h-5 text-red-700 shrink-0" />
           )}
           <span>{feedback.message}</span>
         </div>
@@ -218,22 +355,22 @@ export const AsesorDashboardView: React.FC = () => {
 
       {/* Listado de Casos Asignados al Asesor */}
       {isLoading ? (
-        <div className="p-8 rounded-2xl bg-white border-2 border-slate-300 text-center text-xs font-bold text-slate-600">
+        <div className="p-10 rounded-3xl bg-white border-2 border-charcoal-300 text-center text-xs font-bold text-charcoal-600">
           Cargando tus casos asignados...
         </div>
-      ) : misCasos.length === 0 ? (
-        <div className="p-8 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 text-center space-y-2">
-          <FolderOpen className="w-8 h-8 text-slate-400 mx-auto" />
-          <p className="text-sm font-black text-slate-800">
-            Aún no tienes casos asignados
+      ) : casosFiltrados.length === 0 ? (
+        <div className="p-10 rounded-3xl bg-olive-50/60 border-2 border-dashed border-olive-400 text-center space-y-2">
+          <FolderOpen weight="duotone" className="w-10 h-10 text-charcoal-400 mx-auto" />
+          <p className="text-base font-black text-charcoal-900 font-editorial">
+            No tienes casos en esta vista
           </p>
-          <p className="text-xs text-slate-600">
-            Cuando el Jefe de Consultorio te asigne una solicitud desde su panel, aparecerá aquí automáticamente.
+          <p className="text-xs text-charcoal-600 max-w-md mx-auto">
+            Cuando el Jefe de Consultorio te asigne una solicitud desde su panel de supervisión, aparecerá aquí automáticamente.
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {misCasos.map((caso) => {
+          {casosFiltrados.map((caso) => {
             const rowKey = caso.id || caso.codigo_sms;
             const isOpen = casoAbiertoId === rowKey;
             const fw = caso.formulario_web || {};
@@ -245,79 +382,84 @@ export const AsesorDashboardView: React.FC = () => {
             return (
               <div
                 key={rowKey}
-                className="rounded-2xl bg-white border-2 border-slate-300 shadow-sm overflow-hidden"
+                className="rounded-3xl bg-white border-2 border-charcoal-800 shadow-sm overflow-hidden transition"
               >
                 {/* Encabezado de la tarjeta del caso */}
-                <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3 flex-wrap">
+                <div className="p-5 bg-olive-50/70 border-b border-olive-200 flex items-center justify-between gap-4 flex-wrap">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono font-black text-xs px-2.5 py-1 rounded bg-brand-900 text-white">
+                      <span className="font-mono font-black text-xs px-3 py-1 rounded-lg bg-charcoal-900 text-aqua-300">
                         {caso.codigo_sms}
                       </span>
-                      <span className="px-2.5 py-1 rounded text-[11px] font-black uppercase bg-emerald-100 text-emerald-950 border border-emerald-500">
+                      <span className="px-3 py-1 rounded-lg text-[11px] font-black uppercase bg-olive-200 text-charcoal-950 border border-olive-500">
                         Estado actual: {caso.estado}
                       </span>
                     </div>
-                    <h3 className="text-sm font-black text-slate-950">
+                    <h3 className="text-base font-black text-charcoal-950 font-editorial pt-0.5">
                       {caso.tipo_problema}
                     </h3>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() =>
-                      setCasoAbiertoId(isOpen ? null : rowKey)
-                    }
-                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border-2 border-slate-400 text-slate-900 font-black text-xs inline-flex items-center gap-1.5"
+                    onClick={() => setCasoAbiertoId(isOpen ? null : rowKey)}
+                    className="px-4 py-2.5 rounded-xl bg-white hover:bg-olive-100 border-2 border-charcoal-700 text-charcoal-950 font-black text-xs inline-flex items-center gap-2 transition"
                   >
                     <span>{isOpen ? 'Cerrar detalle' : 'Abrir caso'}</span>
                     {isOpen ? (
-                      <ChevronUp className="w-4 h-4" />
+                      <CaretUp weight="bold" className="w-4 h-4" />
                     ) : (
-                      <ChevronDown className="w-4 h-4" />
+                      <CaretDown weight="bold" className="w-4 h-4" />
                     )}
                   </button>
                 </div>
 
                 {/* Cuerpo desplegable del caso */}
                 {isOpen && (
-                  <div className="p-4 space-y-5 text-xs">
-                    {/* Datos del ciudadano y del problema */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-slate-500 block">
-                          Ciudadano Solicitante
+                  <div className="p-5 sm:p-6 space-y-6 text-xs animate-fadeIn">
+                    {/* Datos del ciudadano y del problema en Grid Responsivo */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-2xl bg-charcoal-50 border border-charcoal-200">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase text-charcoal-500 flex items-center gap-1">
+                          <UserCircle weight="duotone" className="w-3.5 h-3.5 text-institucional-600" />
+                          <span>Ciudadano Solicitante</span>
                         </span>
-                        <span className="font-bold text-slate-950">
+                        <span className="font-bold text-sm text-charcoal-950 block">
                           {ciudadano.nombre_completo ||
+                            [ciudadano.nombres, ciudadano.apellidos].filter(Boolean).join(' ') ||
                             (fw.nombre_completo as string) ||
                             'Registrado vía WhatsApp'}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-slate-500 block">
+
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase text-charcoal-500 block">
                           Documento / Teléfono
                         </span>
-                        <span className="font-bold text-slate-950">
+                        <span className="font-mono font-bold text-charcoal-950 block">
                           {ciudadano.numero_documento || 'Sin doc'}{' '}
                           {ciudadano.telefono ? `• ${ciudadano.telefono}` : ''}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-slate-500 block">
-                          Municipio / Vereda
+
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase text-charcoal-500 flex items-center gap-1">
+                          <MapPinLine weight="duotone" className="w-3.5 h-3.5 text-olive-700" />
+                          <span>Municipio / Vereda</span>
                         </span>
-                        <span className="font-bold text-slate-950">
-                          {[ciudadano.vereda, ciudadano.municipio]
+                        <span className="font-bold text-charcoal-950 block">
+                          {[ciudadano.vereda || ciudadano.vereda_o_barrio, ciudadano.municipio]
                             .filter(Boolean)
                             .join(', ') || 'No especificado'}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-[10px] font-black uppercase text-slate-500 block">
-                          Entidad Accionada / Destinataria
+
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase text-charcoal-500 flex items-center gap-1">
+                          <Buildings weight="duotone" className="w-3.5 h-3.5 text-institucional-600" />
+                          <span>Entidad Destinataria</span>
                         </span>
-                        <span className="font-bold text-slate-950">
+                        <span className="font-bold text-charcoal-950 block">
                           {typeof fw.entidad === 'string'
                             ? fw.entidad
                             : fw.entidad?.nombre || 'Por definir'}
@@ -325,22 +467,22 @@ export const AsesorDashboardView: React.FC = () => {
                       </div>
 
                       {fw.hechos && (
-                        <div className="sm:col-span-2">
-                          <span className="text-[10px] font-black uppercase text-slate-500 block">
+                        <div className="md:col-span-2 lg:col-span-2 pt-2 border-t border-charcoal-200">
+                          <span className="text-[10px] font-black uppercase text-charcoal-500 block">
                             Hechos relatados por el ciudadano
                           </span>
-                          <p className="font-medium text-slate-800 mt-0.5 leading-relaxed">
+                          <p className="font-medium text-charcoal-800 mt-1 leading-relaxed">
                             {String(fw.hechos)}
                           </p>
                         </div>
                       )}
 
                       {fw.peticion && (
-                        <div className="sm:col-span-2">
-                          <span className="text-[10px] font-black uppercase text-slate-500 block">
+                        <div className="md:col-span-2 lg:col-span-2 pt-2 border-t border-charcoal-200">
+                          <span className="text-[10px] font-black uppercase text-charcoal-500 block">
                             Petición / Pretensión
                           </span>
-                          <p className="font-medium text-slate-800 mt-0.5 leading-relaxed">
+                          <p className="font-medium text-charcoal-800 mt-1 leading-relaxed">
                             {String(fw.peticion)}
                           </p>
                         </div>
@@ -348,28 +490,28 @@ export const AsesorDashboardView: React.FC = () => {
                     </div>
 
                     {/* Sección de Descarga del Documento Generado (.docx) */}
-                    <div className="p-3.5 rounded-xl bg-emerald-50 border-2 border-emerald-600 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <h4 className="font-black text-emerald-950 text-xs">
+                    <div className="p-4 rounded-2xl bg-olive-50 border-2 border-olive-500 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <h4 className="font-black text-charcoal-950 text-xs sm:text-sm font-editorial">
                           Documento Legal (Motor de Plantillas .docx)
                         </h4>
-                        <p className="text-[11px] text-emerald-900">
+                        <p className="text-[11px] text-charcoal-700">
                           {docUrl
                             ? 'El documento fue rellenado automáticamente con los datos del ciudadano y está listo para revisión.'
-                            : 'Este caso fue iniciado por WhatsApp. Puedes generar el documento .docx ahora mismo con un clic.'}
+                            : 'Puedes generar el documento .docx oficial ahora mismo con un clic.'}
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
                         {docUrl && (
                           <a
                             href={docUrl}
                             download
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="min-h-[42px] px-4 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-black text-xs inline-flex items-center gap-2 border-2 border-emerald-950"
+                            className="min-h-[44px] px-4 py-2 rounded-xl bg-olive-700 hover:bg-olive-800 text-white font-black text-xs inline-flex items-center gap-2 border-2 border-charcoal-950 transition"
                           >
-                            <FileDown className="w-4 h-4" />
+                            <DownloadSimple weight="bold" className="w-4 h-4" />
                             <span>Descargar Documento (.docx)</span>
                           </a>
                         )}
@@ -378,9 +520,9 @@ export const AsesorDashboardView: React.FC = () => {
                           type="button"
                           disabled={generatingDocId === rowKey}
                           onClick={() => handleGenerarDocumento(caso)}
-                          className="min-h-[42px] px-3.5 py-2 rounded-xl bg-white hover:bg-emerald-100 text-emerald-950 font-black text-xs inline-flex items-center gap-1.5 border-2 border-emerald-800"
+                          className="min-h-[44px] px-4 py-2 rounded-xl bg-white hover:bg-olive-200 text-charcoal-950 font-black text-xs inline-flex items-center gap-2 border-2 border-charcoal-800 transition"
                         >
-                          <FileSpreadsheet className="w-4 h-4" />
+                          <FileDoc weight="duotone" className="w-4 h-4 text-institucional-600" />
                           <span>
                             {generatingDocId === rowKey
                               ? 'Generando...'
@@ -392,12 +534,37 @@ export const AsesorDashboardView: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Botones de Cambio de Estado Exactos */}
-                    <div className="space-y-2">
-                      <span className="block text-[11px] font-black uppercase tracking-wider text-slate-700">
-                        Actualizar Estado del Caso:
-                      </span>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {/* Flujo de Estados del Asesor Jurídico */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className="block text-[11px] font-black uppercase tracking-wider text-charcoal-800">
+                            Actualizar Estado del Caso (Flujo Operativo del Asesor):
+                          </span>
+                          {caso.estado !== 'RESPUESTA RECIBIDA' && (
+                            <button
+                              type="button"
+                              disabled={isSimulatingId === rowKey}
+                              onClick={() => handleSimularWorkflow(caso)}
+                              className="px-3 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-950 font-black text-[11px] inline-flex items-center gap-1.5 border border-amber-400 transition shadow-sm active:scale-95"
+                              title="Avanzar secuencialmente hasta el cierre del trámite"
+                            >
+                              <Lightning weight="fill" className="w-3.5 h-3.5 text-amber-700 animate-pulse" />
+                              <span>
+                                {isSimulatingId === rowKey
+                                  ? 'Simulando etapas...'
+                                  : '⚡ Simular avance completo (Demo)'}
+                              </span>
+                            </button>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-charcoal-600 flex items-center gap-1 font-medium">
+                          <ClockCountdown weight="duotone" className="w-4 h-4 text-institucional-600" />
+                          <span>{DESCRIPCION_ESTADO_OPERATIVO[caso.estado]}</span>
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
                         {ESTADOS_GESTION_ASESOR.map((estadoObjetivo) => {
                           const isCurrent = caso.estado === estadoObjetivo;
                           const isBusy =
@@ -411,13 +578,14 @@ export const AsesorDashboardView: React.FC = () => {
                               onClick={() =>
                                 handleCambiarEstado(caso, estadoObjetivo)
                               }
-                              className={`min-h-[44px] px-3 py-2 rounded-xl font-black text-xs border-2 transition-colors flex items-center justify-center text-center ${
+                              className={`min-h-[48px] px-3.5 py-2.5 rounded-xl font-black text-xs border-2 transition flex items-center justify-center text-center gap-1.5 ${
                                 isCurrent
-                                  ? 'bg-emerald-700 text-white border-emerald-950 cursor-default'
-                                  : 'bg-brand-900 hover:bg-brand-950 text-white border-slate-950'
+                                  ? 'bg-olive-600 text-white border-charcoal-950 cursor-default shadow-inner'
+                                  : 'bg-institucional-500 hover:bg-institucional-600 text-white border-charcoal-950 shadow-sm'
                               }`}
                             >
-                              {isBusy ? 'Guardando...' : estadoObjetivo}
+                              {isCurrent && <CheckCircle weight="fill" className="w-4 h-4 shrink-0" />}
+                              <span>{isBusy ? 'Guardando...' : estadoObjetivo}</span>
                             </button>
                           );
                         })}

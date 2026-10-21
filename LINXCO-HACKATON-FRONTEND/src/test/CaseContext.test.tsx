@@ -95,4 +95,43 @@ describe('CaseContext & State Persistence', () => {
     expect(result.current.activeCase).toBeNull();
     expect(localStorage.getItem('justicia_active_code')).toBeNull();
   });
+
+  it('purges activeCode if loadCaseByCode fails with 404/not found', async () => {
+    vi.spyOn(caseService, 'getCase').mockRejectedValue({
+      message: 'Caso no encontrado',
+      status: 404,
+    });
+
+    const { result } = renderHook(() => useCase(), { wrapper });
+
+    act(() => {
+      result.current.setActiveCode('CASO-SMK');
+    });
+    expect(result.current.activeCode).toBe('CASO-SMK');
+
+    await act(async () => {
+      await expect(result.current.loadCaseByCode('CASO-SMK')).rejects.toBeDefined();
+    });
+
+    expect(result.current.activeCode).toBeNull();
+    expect(localStorage.getItem('justicia_active_code')).toBeNull();
+  });
+
+  it('resets isOffline to false when online case is loaded', async () => {
+    vi.spyOn(caseService, 'getCase').mockResolvedValue({
+      id: 'case-1',
+      codigo_sms: 'CASO-8BD',
+      tipo_problema: 'Educación',
+      estado: 'BORRADOR',
+      is_offline: false,
+    });
+
+    const { result } = renderHook(() => useCase(), { wrapper });
+
+    await act(async () => {
+      await result.current.loadCaseByCode('CASO-8BD');
+    });
+
+    expect(result.current.isOffline).toBe(false);
+  });
 });

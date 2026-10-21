@@ -51,21 +51,22 @@ export async function getCase(codigo: string): Promise<Caso> {
   } catch (err) {
     const apiErr = err as ApiError;
 
-    // Check if we have this case locally in mockStorage
-    const localCase = findMockCase(cleanCode);
-    if (localCase) {
-      console.warn(`[caseService] Fallback to local storage for code: ${cleanCode}`);
-      return { ...localCase, is_offline: true };
-    }
+    // Solo caer a mockStorage local si realmente hubo fallo de red o error de servidor (500+)
+    const isNetworkOrDown = apiErr.isNetworkError || apiErr.status === 0 || apiErr.status >= 500;
 
-    // If it was a network error or proxy 500 (backend offline) and not found locally
-    if (apiErr.isNetworkError || apiErr.status === 0 || apiErr.status >= 500) {
+    if (isNetworkOrDown) {
+      const localCase = findMockCase(cleanCode);
+      if (localCase) {
+        console.warn(`[caseService] Fallback to local storage for code: ${cleanCode}`);
+        return { ...localCase, is_offline: true };
+      }
+
       throw new Error(
         `Sin conexión al servidor (puerto 3000) y no se encontró el caso ${cleanCode} en este dispositivo.`
       );
     }
 
-    // Re-throw 404 or backend business errors
+    // Re-throw 404 or backend business errors directamente sin marcar offline falso
     throw err;
   }
 }

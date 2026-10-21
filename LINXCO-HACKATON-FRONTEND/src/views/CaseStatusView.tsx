@@ -1,22 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCase } from '../context/CaseContext';
+import { useAuth } from '../context/AuthContext';
 import { ESTADOS_CASO, EstadoCaso } from '../types';
 import {
   ArrowLeft,
-  CheckCircle2,
+  CheckCircle,
   Clock,
   Circle,
-  AlertCircle,
+  WarningCircle,
   FileText,
-  Search,
-  Loader2,
-} from 'lucide-react';
+  MagnifyingGlass,
+  SpinnerGap,
+  Gauge,
+  UserCheck,
+  Briefcase,
+} from '@phosphor-icons/react';
 
 export const CaseStatusView: React.FC = () => {
   const { codigo } = useParams<{ codigo?: string }>();
   const navigate = useNavigate();
   const { activeCase, activeCode, loadCaseByCode, isLoading, error } = useCase();
+  const { user } = useAuth();
 
   const [inputCode, setInputCode] = useState<string>(codigo || activeCode || '');
   const [localSearchError, setLocalSearchError] = useState<string | null>(null);
@@ -50,48 +55,74 @@ export const CaseStatusView: React.FC = () => {
 
   const activeIndex = getStatusIndex(activeCase?.estado);
 
+  const rolResponsablePorEstado: Record<EstadoCaso, string> = {
+    BORRADOR: 'Ciudadano (Edición abierta) / Jefe de Consultorio (Pendiente de asignación)',
+    VALIDADO: 'Asesor Jurídico Asignado (Revisión técnica y validación legal)',
+    ENVIADO: 'Asesor Jurídico Asignado (Despacho a entidad o juzgado)',
+    RADICADO: 'Entidad Pública / Juzgado Receptor (Confirmación de radicado)',
+    'RESPUESTA RECIBIDA': 'Juzgado / Entidad Accionada (Fallo o contestación de fondo)',
+  };
+
   return (
-    <div className="flex flex-col gap-5 py-6">
-      {/* Back button */}
-      <div>
+    <div className="flex flex-col gap-6 py-6">
+      {/* Back button & Role shortcut */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <button
           type="button"
           onClick={() => navigate('/')}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 py-1 px-2 rounded-md hover:bg-slate-100"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-charcoal-800 hover:text-institucional-600 py-1.5 px-3 rounded-xl hover:bg-olive-100 transition"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft weight="bold" className="w-4 h-4" />
           Volver al inicio
         </button>
+
+        {user && (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                user.rol === 'Jefe de Consultorio' ? '/admin/jefe' : '/admin/asesor'
+              )
+            }
+            className="inline-flex items-center gap-1.5 text-xs font-black text-white bg-institucional-500 hover:bg-institucional-600 px-3.5 py-2 rounded-xl border border-charcoal-900 transition"
+          >
+            <Gauge weight="duotone" className="w-4 h-4 text-aqua-300" />
+            <span>Gestionar en mi Panel ({user.rol})</span>
+          </button>
+        )}
       </div>
 
       <div className="text-left">
-        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+        <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-institucional-600">
+          Trazabilidad de Solicitudes
+        </span>
+        <h2 className="text-2xl sm:text-3xl font-black text-charcoal-950 tracking-tight font-editorial">
           Estado de tu trámite
         </h2>
-        <p className="text-sm text-slate-600 mt-1">
-          Sigue la evolución de tu solicitud ante entidades públicas y juzgados.
+        <p className="text-sm text-charcoal-600 mt-1">
+          Sigue la evolución de tu solicitud ante entidades públicas y juzgados según el rol que la gestiona.
         </p>
       </div>
 
       {/* Lookup Bar */}
-      <form onSubmit={handleSearch} className="flex gap-2">
+      <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2.5">
         <input
           type="text"
           value={inputCode}
           onChange={(e) => setInputCode(e.target.value.toUpperCase())}
           placeholder="Código (Ej: CASO-SJH)"
-          className="flex-1 min-h-[48px] px-3 py-2 text-sm font-mono font-bold uppercase rounded-lg border-2 border-slate-400 bg-white text-slate-900 focus:border-brand-900"
+          className="flex-1 min-h-[50px] px-4 py-2 text-sm font-mono font-bold uppercase rounded-xl border-2 border-charcoal-400 bg-white text-charcoal-950 focus:border-institucional-500"
         />
         <button
           type="submit"
           disabled={isLoading}
-          className="min-h-[48px] px-4 py-2 bg-brand-900 hover:bg-brand-950 text-white font-bold rounded-lg border-2 border-brand-950 flex items-center justify-center gap-1.5 text-xs uppercase"
+          className="min-h-[50px] px-6 py-2 bg-institucional-500 hover:bg-institucional-600 text-white font-black rounded-xl border-2 border-charcoal-950 flex items-center justify-center gap-2 text-xs uppercase transition"
         >
           {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <SpinnerGap weight="bold" className="w-4 h-4 animate-spin" />
           ) : (
             <>
-              <Search className="w-4 h-4" />
+              <MagnifyingGlass weight="bold" className="w-4 h-4" />
               <span>Buscar</span>
             </>
           )}
@@ -101,98 +132,175 @@ export const CaseStatusView: React.FC = () => {
       {(error || localSearchError) && (
         <div
           role="alert"
-          className="p-3 bg-red-50 border-2 border-red-300 rounded-lg text-xs text-red-800 flex items-start gap-2"
+          className="p-3.5 bg-red-50 border-2 border-red-400 rounded-xl text-xs font-bold text-red-900 flex items-start gap-2.5"
         >
-          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+          <WarningCircle weight="duotone" className="w-5 h-5 text-red-700 shrink-0 mt-0.5" />
           <span>{error || localSearchError}</span>
         </div>
       )}
 
       {/* Case Details Card */}
       {activeCase && (
-        <div className="flex flex-col gap-5">
-          <div className="p-4 rounded-xl bg-slate-50 border-2 border-slate-300 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-600 uppercase">Código radicado</span>
-              <span className="font-mono text-sm font-black text-brand-900 bg-brand-100 px-2 py-0.5 rounded border border-brand-300">
-                {activeCase.codigo_sms}
-              </span>
-            </div>
-            <div className="border-t border-slate-200 pt-2 flex flex-col gap-1">
-              <span className="text-xs font-bold text-slate-800">
-                {activeCase.tipo_problema}
-              </span>
-              {activeCase.created_at && (
-                <span className="text-[11px] text-slate-500">
-                  Registrado el {new Date(activeCase.created_at).toLocaleDateString('es-CO')}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Columna izquierda: Resumen del Caso y Acciones según el Estado y el Usuario */}
+          <div className="lg:col-span-5 flex flex-col gap-4">
+            <div className="p-5 rounded-2xl bg-white border-2 border-charcoal-800 shadow-sm flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-charcoal-600 uppercase">
+                  Código de seguimiento
                 </span>
-              )}
+                <span className="font-mono text-sm font-black text-charcoal-950 bg-olive-200 px-3 py-1 rounded-lg border border-olive-400">
+                  {activeCase.codigo_sms}
+                </span>
+              </div>
+
+              <div className="border-t border-charcoal-100 pt-3 flex flex-col gap-1.5">
+                <span className="text-sm font-black text-charcoal-950 font-editorial">
+                  {activeCase.tipo_problema}
+                </span>
+                {activeCase.formulario_web?.ciudadano?.nombre_completo && (
+                  <span className="text-xs font-bold text-charcoal-700">
+                    Solicitante: {activeCase.formulario_web.ciudadano.nombre_completo}
+                  </span>
+                )}
+                {activeCase.formulario_web?.ciudadano?.municipio && (
+                  <span className="text-xs text-charcoal-600">
+                    Ubicación: {[
+                      activeCase.formulario_web.ciudadano.vereda ||
+                        activeCase.formulario_web.ciudadano.vereda_o_barrio,
+                      activeCase.formulario_web.ciudadano.municipio,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </span>
+                )}
+                {activeCase.created_at && (
+                  <span className="text-[11px] font-mono text-charcoal-500 mt-1">
+                    Registrado el {new Date(activeCase.created_at).toLocaleDateString('es-CO')}
+                  </span>
+                )}
+              </div>
+
+              {/* Explicación de cómo opera el estado actual según el rol */}
+              <div className="p-3 rounded-xl bg-olive-50 border border-olive-300 text-xs space-y-1">
+                <div className="flex items-center gap-1.5 font-black text-charcoal-900">
+                  {activeCase.estado === 'BORRADOR' ? (
+                    <Briefcase weight="duotone" className="w-4 h-4 text-amber-700" />
+                  ) : (
+                    <UserCheck weight="duotone" className="w-4 h-4 text-institucional-600" />
+                  )}
+                  <span>Responsable en etapa {activeCase.estado}:</span>
+                </div>
+                <p className="text-charcoal-700 text-[11px] leading-relaxed">
+                  {rolResponsablePorEstado[activeCase.estado]}
+                </p>
+              </div>
             </div>
+
+            {/* Notificación de Trámite Finalizado y Resuelto */}
+            {activeCase.estado === 'RESPUESTA RECIBIDA' && (
+              <div className="p-4 rounded-2xl bg-olive-100 border-2 border-olive-500 text-charcoal-950 flex items-start gap-3 shadow-sm">
+                <CheckCircle weight="fill" className="w-6 h-6 text-olive-700 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-black text-xs uppercase tracking-wide text-olive-900 font-editorial">
+                    ¡Trámite finalizado con éxito!
+                  </h4>
+                  <p className="text-[11px] text-charcoal-800 mt-1 leading-relaxed font-medium">
+                    El Consultorio Jurídico ha recibido la contestación de fondo o fallo judicial. El ciclo completo de tu solicitud ha concluido formalmente.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Generated Document Download if available */}
+            {Boolean(activeCase.ruta_documento || activeCase.formulario_web?.ruta_documento) && (
+              <a
+                href={String(activeCase.ruta_documento || activeCase.formulario_web?.ruta_documento)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-olive-700 hover:bg-olive-800 text-white font-bold text-sm flex items-center justify-center gap-2 border-2 border-charcoal-950 transition"
+              >
+                <FileText weight="duotone" className="w-5 h-5" />
+                <span>Descargar Documento Generado (.docx)</span>
+              </a>
+            )}
+
+            {/* Action to edit/resume if in BORRADOR (Ciudadano solo puede editar cuando está en BORRADOR) */}
+            {activeCase.estado === 'BORRADOR' && (
+              <button
+                type="button"
+                onClick={() => navigate('/wizard')}
+                className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-institucional-500 hover:bg-institucional-600 text-white font-bold text-sm flex items-center justify-center gap-2 border-2 border-charcoal-950 transition"
+              >
+                <FileText weight="duotone" className="w-5 h-5" />
+                <span>Continuar editando solicitud</span>
+              </button>
+            )}
           </div>
 
-          {/* 5 Exact Status Progression Stepper */}
-          <div className="flex flex-col gap-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">
-              Línea de progreso legal
+          {/* Columna derecha: 5 Exact Status Progression Stepper */}
+          <div className="lg:col-span-7 flex flex-col gap-3">
+            <h3 className="text-xs font-black uppercase tracking-wider text-charcoal-700">
+              Línea de progreso legal (5 Etapas Oficiales)
             </h3>
 
-            <div className="flex flex-col gap-3 bg-white p-4 rounded-xl border-2 border-slate-300 shadow-sm">
+            <div className="flex flex-col gap-3 bg-white p-5 sm:p-6 rounded-2xl border-2 border-charcoal-800 shadow-sm">
               {ESTADOS_CASO.map((statusName: EstadoCaso, idx: number) => {
                 const isCompleted = idx < activeIndex;
                 const isCurrent = idx === activeIndex;
 
                 return (
-                  <div key={statusName} className="flex items-start gap-3 relative">
+                  <div key={statusName} className="flex items-start gap-3.5 relative">
                     {/* Connecting line between stages */}
                     {idx < ESTADOS_CASO.length - 1 && (
                       <div
                         className={`absolute left-3.5 top-7 bottom-0 w-0.5 -mb-3 ${
-                          idx < activeIndex ? 'bg-emerald-600' : 'bg-slate-300'
+                          idx < activeIndex ? 'bg-olive-600' : 'bg-charcoal-200'
                         }`}
                       />
                     )}
 
                     {/* Step Icon */}
                     <div className="relative z-10 shrink-0">
-                      {isCompleted ? (
-                        <CheckCircle2 className="w-7 h-7 text-emerald-700 fill-emerald-100" />
+                      {isCompleted || (isCurrent && statusName === 'RESPUESTA RECIBIDA') ? (
+                        <CheckCircle weight="fill" className="w-7 h-7 text-olive-600" />
                       ) : isCurrent ? (
-                        <div className="w-7 h-7 rounded-full bg-brand-900 text-white flex items-center justify-center font-bold text-xs ring-4 ring-emerald-200">
-                          <Clock className="w-4 h-4 text-white" />
+                        <div className="w-7 h-7 rounded-full bg-institucional-500 text-white flex items-center justify-center font-bold text-xs ring-4 ring-aqua-300/60">
+                          <Clock weight="bold" className="w-4 h-4 text-white" />
                         </div>
                       ) : (
-                        <Circle className="w-7 h-7 text-slate-300" />
+                        <Circle weight="regular" className="w-7 h-7 text-charcoal-300" />
                       )}
                     </div>
 
                     {/* Step Details & Exact Label */}
                     <div className="flex-1 pb-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <span
                           className={`text-sm font-black ${
                             isCurrent
-                              ? 'text-brand-950 underline decoration-brand-600 decoration-2 underline-offset-4'
+                              ? 'text-institucional-700 underline decoration-aqua-400 decoration-2 underline-offset-4'
                               : isCompleted
-                              ? 'text-emerald-900 font-bold'
-                              : 'text-slate-400 font-medium'
+                              ? 'text-olive-800 font-bold'
+                              : 'text-charcoal-400 font-medium'
                           }`}
                         >
                           {statusName}
                         </span>
                         {isCurrent && (
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-brand-100 text-brand-900 border border-brand-300">
+                          <span className="text-[10px] font-mono font-black uppercase px-2.5 py-0.5 rounded-md bg-olive-200 text-charcoal-950 border border-olive-400">
                             Estado actual
                           </span>
                         )}
                       </div>
 
-                      <p className="text-xs text-slate-600 mt-0.5 leading-snug">
+                      <p className="text-xs text-charcoal-600 mt-1 leading-snug">
                         {statusName === 'BORRADOR' &&
-                          'Solicitud en proceso de edición o recién recibida por la plataforma.'}
+                          'Solicitud en proceso de edición por el ciudadano o recién recibida para asignación del Jefe de Consultorio.'}
                         {statusName === 'VALIDADO' &&
-                          'Solicitud revisada y validada por el equipo jurídico.'}
+                          'Solicitud asignada, revisada y validada técnicamente por el Asesor Jurídico.'}
                         {statusName === 'ENVIADO' &&
-                          'Documento legal despachado a la entidad o juzgado competente.'}
+                          'Documento legal despachado por el Consultorio Jurídico a la entidad o juzgado competente.'}
                         {statusName === 'RADICADO' &&
                           'Radicación formal confirmada con número de radicado oficial.'}
                         {statusName === 'RESPUESTA RECIBIDA' &&
@@ -204,38 +312,13 @@ export const CaseStatusView: React.FC = () => {
               })}
             </div>
           </div>
-
-          {/* Generated Document Download if available */}
-          {Boolean(activeCase.ruta_documento || activeCase.formulario_web?.ruta_documento) && (
-            <a
-              href={String(activeCase.ruta_documento || activeCase.formulario_web?.ruta_documento)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-sm flex items-center justify-center gap-2 border-2 border-emerald-950"
-            >
-              <FileText className="w-4 h-4" />
-              <span>Descargar Documento Generado (.docx)</span>
-            </a>
-          )}
-
-          {/* Action to edit/resume if in BORRADOR */}
-          {activeCase.estado === 'BORRADOR' && (
-            <button
-              type="button"
-              onClick={() => navigate('/wizard')}
-              className="w-full min-h-[48px] px-4 py-3 rounded-xl bg-brand-900 hover:bg-brand-950 text-white font-bold text-sm flex items-center justify-center gap-2 border-2 border-brand-950"
-            >
-              <FileText className="w-4 h-4" />
-              <span>Continuar editando solicitud</span>
-            </button>
-          )}
         </div>
       )}
 
       {!activeCase && !isLoading && !error && !localSearchError && (
-        <div className="p-6 text-center text-slate-500 bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl">
-          <p className="text-xs">
-            Ingresa tu código (ej. <span className="font-mono font-bold">CASO-SJH</span>) arriba para consultar el avance.
+        <div className="p-8 text-center text-charcoal-600 bg-olive-50/60 border-2 border-dashed border-olive-400 rounded-2xl">
+          <p className="text-xs sm:text-sm font-medium">
+            Ingresa tu código (ej. <span className="font-mono font-bold text-charcoal-900">CASO-SJH</span>) arriba para consultar el avance.
           </p>
         </div>
       )}

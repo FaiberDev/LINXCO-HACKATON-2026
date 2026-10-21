@@ -2,6 +2,7 @@ require('dotenv').config();
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const pino = require('pino');
+const fs = require('fs');
 const { app, getOrCreateUsuario, procesarMensaje } = require('./index.js');
 
 // Levanta también la API REST del backend para sincronizar con el Frontend (ignora si ya está en otro proceso)
@@ -75,8 +76,34 @@ async function startBot() {
         const usuario = await getOrCreateUsuario(telefono);
         const respuesta = await procesarMensaje(usuario, texto);
 
+        // Si el usuario está en estado REQUIERE_ASESOR, detener respuestas automatizadas
+        if (respuesta === null) {
+          console.log(
+            `[Handoff Asesor Activo - REQUIERE_ASESOR] Respuesta automática detenida para: ${telefono}`
+          );
+          continue;
+        }
+
         await sock.sendMessage(jid, { text: respuesta });
         console.log(`[Respuesta Enviada] A: ${telefono}`);
+
+        // Si se acaba de generar el documento .docx al finalizar RECOLECTANDO_VARIABLES, enviarlo por WhatsApp
+        if (
+          usuario.ultimoDocumentoGenerado &&
+          usuario.ultimoDocumentoGenerado.filePath &&
+          fs.existsSync(usuario.ultimoDocumentoGenerado.filePath)
+        ) {
+          await sock.sendMessage(jid, {
+            document: fs.readFileSync(usuario.ultimoDocumentoGenerado.filePath),
+            fileName: usuario.ultimoDocumentoGenerado.filename,
+            mimetype:
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            caption: `📄 Documento legal generado (${usuario.ultimoDocumentoGenerado.plantillaUsada})`,
+          });
+          console.log(
+            `[Documento Adjunto Enviado] A: ${telefono} -> ${usuario.ultimoDocumentoGenerado.filename}`
+          );
+        }
       } catch (err) {
         console.error('Error procesando mensaje:', err);
         await sock.sendMessage(jid, {

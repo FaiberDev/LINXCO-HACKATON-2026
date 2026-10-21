@@ -2,12 +2,12 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { CaseProvider } from './context/CaseContext';
 import { AuthProvider } from './context/AuthContext';
-import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { ProtectedRoute, RoleRouterController } from './components/auth/ProtectedRoute';
 import { MobileContainer } from './components/layout/MobileContainer';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 
-// Citizen Views
+// Citizen Views (Vista de Usuario: Solicitudes y Orientación)
 import { LandingPage } from './views/LandingPage';
 import { ContinuationPortal } from './views/ContinuationPortal';
 import { WizardView } from './views/WizardView';
@@ -15,7 +15,7 @@ import { CaseStatusView } from './views/CaseStatusView';
 import { LearnRightsView } from './views/LearnRightsView';
 import { LegalClinicView } from './views/LegalClinicView';
 
-// Admin & Auth Views (Prompt 3)
+// Admin & Auth Views (RBAC Separado Físicamente)
 import { LoginView } from './views/LoginView';
 import { JefeDashboardView } from './views/JefeDashboardView';
 import { AsesorDashboardView } from './views/AsesorDashboardView';
@@ -26,8 +26,13 @@ export const AppContent: React.FC = () => {
       <Header />
       <main className="flex-1 flex flex-col">
         <Routes>
-          {/* Rutas del Ciudadano */}
+          {/* Controlador de Vistas por Rol (RBAC Dispatcher) */}
+          <Route path="/dashboard" element={<RoleRouterController fallbackToLogin={true} />} />
+          <Route path="/admin" element={<RoleRouterController fallbackToLogin={true} />} />
+
+          {/* 1. Vista de Usuario (Solicitudes Ciudadanas y Orientación) */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/usuario" element={<ContinuationPortal />} />
           <Route path="/portal" element={<ContinuationPortal />} />
           <Route path="/wizard" element={<WizardView />} />
           <Route path="/estado" element={<CaseStatusView />} />
@@ -35,8 +40,10 @@ export const AppContent: React.FC = () => {
           <Route path="/aprender" element={<LearnRightsView />} />
           <Route path="/asesor" element={<LegalClinicView />} />
 
-          {/* Rutas de Autenticación y Dashboards Administrativos */}
+          {/* Autenticación Institucional */}
           <Route path="/login" element={<LoginView />} />
+
+          {/* 2. Vista de Jefe (Métricas, supervisión y asignación de borradores) */}
           <Route
             path="/admin/jefe"
             element={
@@ -45,6 +52,8 @@ export const AppContent: React.FC = () => {
               </ProtectedRoute>
             }
           />
+
+          {/* 3. Vista de Asesor (Gestión exclusiva de casos asignados y estados) */}
           <Route
             path="/admin/asesor"
             element={

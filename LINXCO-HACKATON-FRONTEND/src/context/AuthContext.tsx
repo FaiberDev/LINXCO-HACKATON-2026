@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '../services/api';
 
 export type RolAdministrativo = 'Jefe de Consultorio' | 'Asesor Jurídico';
+export type RolCuenta = RolAdministrativo | 'Ciudadano';
 
 export interface AdminUser {
   id: string;
@@ -27,7 +28,7 @@ interface AuthContextValue {
   logout: () => void;
 }
 
-const STORAGE_KEY = 'linxco_admin_auth_v1';
+export const AUTH_STORAGE_KEY = 'linxco_admin_auth_v1';
 
 export const FALLBACK_ADMIN_USERS: AdminUser[] = [
   {
@@ -56,31 +57,30 @@ export const FALLBACK_ADMIN_USERS: AdminUser[] = [
   },
 ];
 
+function readStoredSession(): { user: AdminUser | null; token: string | null } {
+  if (typeof window === 'undefined') {
+    return { user: null, token: null };
+  }
+  try {
+    const raw =
+      localStorage.getItem(AUTH_STORAGE_KEY) ||
+      sessionStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return { user: null, token: null };
+    const parsed = JSON.parse(raw);
+    return {
+      user: parsed.user || null,
+      token: parsed.token || null,
+    };
+  } catch {
+    return { user: null, token: null };
+  }
+}
+
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AdminUser | null>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return parsed.user || null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [token, setToken] = useState<string | null>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return parsed.token || null;
-    } catch {
-      return null;
-    }
-  });
-
+  const [user, setUser] = useState<AdminUser | null>(() => readStoredSession().user);
+  const [token, setToken] = useState<string | null>(() => readStoredSession().token);
   const [demoUsers, setDemoUsers] = useState<AdminUser[]>(FALLBACK_ADMIN_USERS);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +101,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  // Sincronización entre pestañas y ante eventos de navegación hacia atrás (popstate / pageshow / storage)
+  useEffect(() => {
+    const syncAuthFromStorage = () => {
+      const current = readStoredSession();
+      if (!current.user || !current.token) {
+        setUser(null);
+        setToken(null);
+      }
+    };
+
+    window.addEventListener('storage', syncAuthFromStorage);
+    window.addEventListener('pageshow', syncAuthFromStorage);
+    window.addEventListener('popstate', syncAuthFromStorage);
+
+    return () => {
+      window.removeEventListener('storage', syncAuthFromStorage);
+      window.removeEventListener('pageshow', syncAuthFromStorage);
+      window.removeEventListener('popstate', syncAuthFromStorage);
+    };
+  }, []);
+
+  const persistSession = (loggedUser: AdminUser, authToken: string) => {
+    setUser(loggedUser);
+    setToken(authToken);
+    const payload = JSON.stringify({ user: loggedUser, token: authToken });
+    try {
+      localStorage.setItem(AUTH_STORAGE_KEY, payload);
+      sessionStorage.setItem(AUTH_STORAGE_KEY, payload);
+      localStorage.removeItem('justicia_active_code');
+      localStorage.removeItem('justicia_active_case');
+      localStorage.removeItem('justicia_wizard_draft');
+    } catch {
+      // Ignore quota errors in restricted environments
+    }
+  };
+
   const login = async (credentials: LoginCredentials): Promise<AdminUser> => {
     setIsLoading(true);
     setError(null);
@@ -114,12 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify(credentials),
       });
 
-      setUser(response.user);
-      setToken(response.token);
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ user: response.user, token: response.token })
-      );
+      persistSession(response.user, response.token);
       return response.user;
     } catch (err) {
       // Fallback local si el backend está offline y coincide con un usuario semilla
@@ -138,12 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (found && isOfflineErr) {
         const offlineToken = `offline-token-${found.id}`;
-        setUser(found);
-        setToken(offlineToken);
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({ user: found, token: offlineToken })
-        );
+        persistSession(found, offlineToken);
         return found;
       }
 
@@ -154,12 +180,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     setToken(null);
     setError(null);
-    localStorage.removeItem(STORAGE_KEY);
-  };
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      sessionStorage.removeItem(AUTH_STORAGE_KEY);
+      sessionStorage.clear();
+      localStorage.removeItem('justicia_active_code');
+      localStorage.removeItem('justicia_active_case');
+      localStorage.removeItem('justicia_wizard_draft');
+    } catch {
+      // Ignore storage access errors
+    }
+  }, []);
 
   return (
     <AuthContext.Provider

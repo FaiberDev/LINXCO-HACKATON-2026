@@ -26,398 +26,248 @@ describe('WizardForm Feature & Acceptance Criteria (R4)', () => {
     );
   };
 
-  it('TC-T1-F13-01: renders Step 1 with mechanism and category choices', () => {
+  it('TC-T1-F13-01: renders Level 1 with the 5 official decision tree categories', () => {
     renderWizardWithRoutes();
 
-    expect(screen.getByText(/Paso 1 de 6/i)).toBeInTheDocument();
-    expect(screen.getByText('¿Qué trámite deseas radicar?')).toBeInTheDocument();
+    expect(screen.getByText(/Nivel 1: Categoría Principal/i)).toBeInTheDocument();
+    expect(
+      screen.getByText('¿En qué área general se encuentra tu problema?')
+    ).toBeInTheDocument();
 
-    // Mechanisms
-    expect(screen.getByRole('button', { name: 'Derecho de petición' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Acción de tutela' })).toBeInTheDocument();
-
-    // Categories
-    expect(screen.getByRole('button', { name: /Salud y bienestar/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Educación y escuela/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Mi vereda y vías/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Otro asunto legal/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /A\. Salud/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /B\. Educación/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /C\. Servicios Públicos/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /D\. Tierras y Vivienda/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /E\. Laboral o Consumo/i })).toBeInTheDocument();
   });
 
-  it('TC-T2-F13-01: blocks advancing step 1 when mechanism or category is missing', () => {
-    localStorage.setItem(
-      'justicia_wizard_draft',
-      JSON.stringify({
-        paso_actual: 1,
-        mecanismo: '',
-        categoria: '',
+  it('TC-T2-F13-01: advances to Level 2 subcategories and blocks empty split Name(s) and Last Name(s)', () => {
+    renderWizardWithRoutes();
+
+    fireEvent.click(screen.getByRole('button', { name: /A\. Salud/i }));
+    expect(screen.getByText(/Nivel 2: Situación Específica/i)).toBeInTheDocument();
+
+    // Seleccionar subcategoría de Derecho de Petición Medicamentos
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /Me niegan o demoran la entrega de medicamentos/i,
       })
     );
 
-    renderWizardWithRoutes();
-
-    const btnSiguiente = screen.getByRole('button', { name: /Siguiente/i });
-    fireEvent.click(btnSiguiente);
-
-    // Validation alert
-    expect(screen.getByRole('alert')).toHaveTextContent(/Selecciona el mecanismo legal/i);
     expect(screen.getByText(/Paso 1 de 6/i)).toBeInTheDocument();
+
+    // Intentar avanzar sin llenar Nombre(s) ni Apellido(s)
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /Por favor ingresa tanto el Nombre\(s\) como el Apellido\(s\)/i
+    );
   });
 
-  it('TC-T1-F13-02: advances to Step 2 and validates citizen inputs', () => {
+  it('TC-T1-F13-02: collects split Name/Last Name, Document, Entity, Diagnosis, Medication, and Municipality Autocomplete', async () => {
+    const postDocSpy = vi.spyOn(api, 'apiFetch').mockImplementation(async (url) => {
+      if (url === '/generar-documento') {
+        return {
+          success: true,
+          codigo: 'CASO-R8W',
+          ruta_documento: '/api/documentos/CASO-R8W.docx',
+        };
+      }
+      return {};
+    });
+
     renderWizardWithRoutes();
 
-    // Step 1: select category
-    fireEvent.click(screen.getByRole('button', { name: /Salud y bienestar/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    // Nivel 1 -> Salud
+    fireEvent.click(screen.getByRole('button', { name: /A\. Salud/i }));
 
-    // Now in Step 2
-    expect(screen.getByText(/Paso 2 de 6/i)).toBeInTheDocument();
-    expect(screen.getByText('¿Quién presenta la solicitud?')).toBeInTheDocument();
+    // Nivel 2 -> Tutela Medicamentos
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /No me entregan medicamentos urgentes/i,
+      })
+    );
 
-    // Try to advance without filling required fields
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-    expect(screen.getByRole('alert')).toHaveTextContent(/Ingresa tu nombre completo/i);
-
-    // Fill citizen fields
-    fireEvent.change(screen.getByLabelText(/Nombre completo \*/i), {
-      target: { value: 'María Rodríguez' },
+    // Variable 1: Nombre(s) y Apellido(s) separados en grid de dos columnas
+    fireEvent.change(screen.getByLabelText(/Nombre\(s\) \*/i), {
+      target: { value: 'María Fernanda' },
     });
-    fireEvent.change(screen.getByLabelText(/Número doc\. \*/i), {
+    fireEvent.change(screen.getByLabelText(/Apellido\(s\) \*/i), {
+      target: { value: 'Rodríguez Gómez' },
+    });
+    expect(screen.getByText('María Fernanda Rodríguez Gómez')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
+
+    // Variable 2: Número de cédula
+    expect(screen.getByText(/Paso 2 de 6/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/¿Cuál es tu número de cédula\?/i), {
       target: { value: '34567890' },
     });
-    fireEvent.change(screen.getByLabelText(/Teléfono \/ WhatsApp \*/i), {
-      target: { value: '3109876543' },
-    });
-    fireEvent.change(screen.getByLabelText(/Municipio/i), {
-      target: { value: 'Popayán' },
-    });
-    fireEvent.change(screen.getByLabelText(/Vereda \/ Sector/i), {
-      target: { value: 'El Sendero' },
-    });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
 
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Now in Step 3
+    // Variable 3: EPS con sugerencias rápidas
     expect(screen.getByText(/Paso 3 de 6/i)).toBeInTheDocument();
-  });
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva EPS' }));
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
 
-  it('TC-T1-F13-03: advances to Step 3 and validates target entity', () => {
-    // Seed draft up to step 3
-    localStorage.setItem(
-      'justicia_wizard_draft',
-      JSON.stringify({
-        paso_actual: 3,
-        mecanismo: 'Acción de tutela',
-        categoria: 'SALUD',
-        ciudadano: {
-          nombre_completo: 'María Rodríguez',
-          numero_documento: '34567890',
-          telefono: '3109876543',
-        },
-      })
-    );
-
-    renderWizardWithRoutes();
-
-    expect(screen.getByText(/Paso 3 de 6/i)).toBeInTheDocument();
-    expect(screen.getByText('¿A quién se le reclama?')).toBeInTheDocument();
-
-    // Attempt advancing with empty entity
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      /Indica la entidad o autoridad a la que va dirigida la solicitud/i
-    );
-
-    // Fill entity
-    fireEvent.change(screen.getByLabelText(/Nombre de la entidad o autoridad \*/i), {
-      target: { value: 'Nueva EPS' },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Now in Step 4
+    // Variable 4: Diagnóstico médico
     expect(screen.getByText(/Paso 4 de 6/i)).toBeInTheDocument();
-  });
-
-  it('TC-T1-F13-04: advances to Step 4 and validates facts narrative length (min 15 chars)', () => {
-    localStorage.setItem(
-      'justicia_wizard_draft',
-      JSON.stringify({
-        paso_actual: 4,
-        mecanismo: 'Acción de tutela',
-        categoria: 'SALUD',
-        ciudadano: {
-          nombre_completo: 'María Rodríguez',
-          numero_documento: '34567890',
-          telefono: '3109876543',
-        },
-        entidad: 'Nueva EPS',
-      })
-    );
-
-    renderWizardWithRoutes();
-
-    expect(screen.getByText(/Paso 4 de 6/i)).toBeInTheDocument();
-    expect(screen.getByText('¿Qué ocurrió? (Los Hechos)')).toBeInTheDocument();
-
-    // Less than 15 chars
-    fireEvent.change(screen.getByLabelText(/Descripción de los hechos \*/i), {
-      target: { value: 'No hay citas' },
+    fireEvent.change(screen.getByLabelText(/¿Cuál es el diagnóstico médico exacto\?/i), {
+      target: { value: 'Hipertensión arterial crónica severa' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      /Describe los hechos de manera clara \(mínimo 15 caracteres\)/i
-    );
-
-    // Enter valid facts (>= 15 chars)
-    fireEvent.change(screen.getByLabelText(/Descripción de los hechos \*/i), {
-      target: {
-        value: 'Desde hace 3 meses no me entregan los medicamentos para mi hipertensión arterial.',
-      },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Now in Step 5
+    // Variable 5: Medicamento urgente
     expect(screen.getByText(/Paso 5 de 6/i)).toBeInTheDocument();
-  });
-
-  it('TC-T1-F13-05: advances to Step 5 and validates petition narrative length (min 10 chars)', () => {
-    localStorage.setItem(
-      'justicia_wizard_draft',
-      JSON.stringify({
-        paso_actual: 5,
-        mecanismo: 'Acción de tutela',
-        categoria: 'SALUD',
-        ciudadano: {
-          nombre_completo: 'María Rodríguez',
-          numero_documento: '34567890',
-          telefono: '3109876543',
-        },
-        entidad: 'Nueva EPS',
-        hechos: 'Desde hace 3 meses no me entregan los medicamentos para mi hipertensión arterial.',
-      })
+    fireEvent.change(
+      screen.getByLabelText(/¿Qué medicamento urgente y dosis te negaron\?/i),
+      {
+        target: { value: 'Losartán 50mg cada 12 horas' },
+      }
     );
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
 
-    renderWizardWithRoutes();
-
-    expect(screen.getByText(/Paso 5 de 6/i)).toBeInTheDocument();
-    expect(screen.getByText('¿Qué solicitas con exactitud?')).toBeInTheDocument();
-
-    // Short petition (< 10 chars)
-    fireEvent.change(screen.getByLabelText(/Petición concreta \/ Pretensión \*/i), {
-      target: { value: 'Ayuda' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      /Especifica qué solicitas con claridad \(mínimo 10 caracteres\)/i
-    );
-
-    // Valid petition
-    fireEvent.change(screen.getByLabelText(/Petición concreta \/ Pretensión \*/i), {
-      target: {
-        value: 'Solicito la entrega inmediata de mis medicamentos Losartán e Hidroclorotiazida.',
-      },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Step 6: Review & Submit
+    // Variable 6: Municipio con autocompletado DANE ("VA" -> VAUPÉS, VALLE DEL CAUCA) y Vereda
     expect(screen.getByText(/Paso 6 de 6/i)).toBeInTheDocument();
-    expect(screen.getByText('Revisión y confirmación')).toBeInTheDocument();
-  });
+    const munInput = screen.getByLabelText(/Municipio \(DANE\) \*/i);
+    fireEvent.focus(munInput);
+    fireEvent.change(munInput, { target: { value: 'VA' } });
 
-  it('TC-T1-F14-01: Step 6 displays complete review card and submits POST request returning CASO-XXX', async () => {
-    const postApiSpy = vi.spyOn(api, 'apiFetch').mockResolvedValue({
-      success: true,
-      data: {
-        id: 'uuid-new-1',
-        codigo_sms: 'CASO-R8W',
-        tipo_problema: 'Acción de tutela (SALUD: Trámite web)',
-        estado: 'VALIDADO',
-        formulario_web: {
-          mecanismo: 'Acción de tutela',
-          categoria: 'SALUD',
-        },
-        created_at: new Date().toISOString(),
-      },
-    });
+    // Verifica que al escribir "VA" aparecen sugerencias de departamentos VAUPÉS y VALLE DEL CAUCA
+    expect(screen.getAllByRole('button', { name: /VAUPÉS/i }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole('button', { name: /VALLE DEL CAUCA/i }).length).toBeGreaterThanOrEqual(1);
 
-    localStorage.setItem(
-      'justicia_wizard_draft',
-      JSON.stringify({
-        paso_actual: 6,
-        mecanismo: 'Acción de tutela',
-        categoria: 'SALUD',
-        ciudadano: {
-          nombre_completo: 'María Rodríguez',
-          numero_documento: '34567890',
-          telefono: '3109876543',
-        },
-        entidad: 'Nueva EPS',
-        hechos: 'Desde hace 3 meses no me entregan los medicamentos para mi hipertensión.',
-        peticion: 'Solicito la entrega inmediata de mis medicamentos vitales formulados.',
-      })
+    fireEvent.change(munInput, { target: { value: 'La Cumbre, Valle del Cauca' } });
+    fireEvent.change(
+      screen.getByLabelText(/Vereda, Corregimiento o Dirección \*/i),
+      { target: { value: 'Vereda Pavas' } }
     );
+    fireEvent.click(screen.getByRole('button', { name: /Revisar datos/i }));
 
-    renderWizardWithRoutes();
+    // Resumen Final
+    expect(screen.getByText(/Confirmación de Plantilla/i)).toBeInTheDocument();
+    expect(screen.getByText('María Fernanda Rodríguez Gómez')).toBeInTheDocument();
+    expect(screen.getByText('Nueva EPS')).toBeInTheDocument();
 
-    // Review card checks
-    expect(screen.getByText(/Acción de tutela — SALUD/i)).toBeInTheDocument();
-    expect(screen.getByText(/María Rodríguez/i)).toBeInTheDocument();
-    expect(screen.getByText(/Nueva EPS/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Generar Documento/i }));
 
-    // Submit button
-    const btnSubmit = screen.getByRole('button', { name: /Enviar solicitud/i });
-    expect(btnSubmit).toBeInTheDocument();
-    fireEvent.click(btnSubmit);
-
-    // Verify API called with POST /casos and JSON payload
     await waitFor(() => {
-      expect(postApiSpy).toHaveBeenCalledWith(
-        '/casos',
+      expect(postDocSpy).toHaveBeenCalledWith(
+        '/generar-documento',
         expect.objectContaining({
           method: 'POST',
-          body: expect.stringContaining('"mecanismo":"Acción de tutela"'),
         })
       );
-    });
-
-    // Confirmation screen
-    await waitFor(() => {
-      expect(screen.getByText('¡Trámite radicado exitosamente!')).toBeInTheDocument();
       expect(screen.getByText('CASO-R8W')).toBeInTheDocument();
     });
 
-    // Copy code button
-    expect(screen.getByRole('button', { name: /Copiar código al portapapeles/i })).toBeInTheDocument();
-
-    // Navigation buttons
-    expect(
+    // Navegar a la vista de estado
+    fireEvent.click(
       screen.getByRole('button', { name: /Ver estado y progreso del trámite/i })
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Volver al inicio/i })).toBeInTheDocument();
-  });
-
-  it('TC-T1-F14-02: updates existing case via PUT when continuing draft with activeCode', async () => {
-    const putApiSpy = vi.spyOn(api, 'apiFetch').mockResolvedValue({
-      success: true,
-      data: {
-        id: 'uuid-update-1',
-        codigo_sms: 'CASO-SJH',
-        tipo_problema: 'Derecho de petición (EDUCACION: Trámite web)',
-        estado: 'VALIDADO',
-        formulario_web: {
-          mecanismo: 'Derecho de petición',
-        },
-      },
-    });
-
-    localStorage.setItem('justicia_active_code', 'CASO-SJH');
-    localStorage.setItem(
-      'justicia_wizard_draft',
-      JSON.stringify({
-        paso_actual: 6,
-        mecanismo: 'Derecho de petición',
-        categoria: 'EDUCACION',
-        ciudadano: {
-          nombre_completo: 'Carlos Gómez',
-          numero_documento: '1053456789',
-          telefono: '3201234567',
-        },
-        entidad: 'Secretaría de Educación',
-        hechos: 'Faltan profesores en la escuela de la vereda La Aguadita.',
-        peticion: 'Solicito nombrar los dos profesores faltantes de manera urgente.',
-      })
     );
-
-    renderWizardWithRoutes();
-
-    const btnSubmit = screen.getByRole('button', { name: /Enviar solicitud/i });
-    fireEvent.click(btnSubmit);
-
-    await waitFor(() => {
-      expect(putApiSpy).toHaveBeenCalledWith(
-        '/casos/CASO-SJH',
-        expect.objectContaining({
-          method: 'PUT',
-          body: expect.stringContaining('"mecanismo":"Derecho de petición"'),
-        })
-      );
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('CASO-SJH')).toBeInTheDocument();
-    });
+    expect(screen.getByTestId('status-view')).toBeInTheDocument();
   });
 
-  it('TC-T2-F19-03: supports backward and forward step traversal preserving draft', () => {
-    renderWizardWithRoutes();
-
-    // Step 1: select mechanism and category
-    fireEvent.click(screen.getByRole('button', { name: 'Derecho de petición' }));
-    fireEvent.click(screen.getByRole('button', { name: /Educación y escuela/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Step 2: enter citizen name
-    expect(screen.getByText(/Paso 2 de 6/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Nombre completo \*/i), {
-      target: { value: 'Rosa Elena Silva' },
-    });
-
-    // Click "Anterior"
-    fireEvent.click(screen.getByRole('button', { name: /Anterior/i }));
-
-    // Back to Step 1
-    expect(screen.getByText(/Paso 1 de 6/i)).toBeInTheDocument();
-
-    // Click "Siguiente"
-    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-
-    // Back in Step 2; verify input retained
-    expect(screen.getByText(/Paso 2 de 6/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Nombre completo \*/i)).toHaveValue('Rosa Elena Silva');
-  });
-
-  it('TC-T1-F14-05: clicking "Ver estado y progreso del trámite" on confirmation screen navigates to /estado/:codigo', async () => {
+  it('TC-T2-F19-03: supports "Otra" option handoff to Human Legal Advisor', async () => {
     vi.spyOn(api, 'apiFetch').mockResolvedValue({
       success: true,
       data: {
-        codigo_sms: 'CASO-NAV1',
-        tipo_problema: 'Derecho de petición',
-        estado: 'VALIDADO',
+        id: 'uuid-otra-1',
+        codigo_sms: 'CASO-OTR',
+        tipo_problema: 'Requiere Asesor — Tierras y Vivienda',
+        estado: 'BORRADOR',
       },
     });
 
-    localStorage.setItem(
-      'justicia_wizard_draft',
-      JSON.stringify({
-        paso_actual: 6,
-        mecanismo: 'Derecho de petición',
-        categoria: 'EDUCACION',
-        ciudadano: {
-          nombre_completo: 'Carlos Gómez',
-          numero_documento: '1053456789',
-          telefono: '3201234567',
-        },
-        entidad: 'Secretaría de Educación',
-        hechos: 'Faltan docentes desde el mes pasado en la escuela.',
-        peticion: 'Solicito asignar los docentes de manera pronta.',
+    renderWizardWithRoutes();
+
+    fireEvent.click(screen.getByRole('button', { name: /D\. Tierras y Vivienda/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Otra situación de tierras/i }));
+
+    expect(screen.getByText(/Derivación a Asesor/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Nombre\(s\)/i), {
+      target: { value: 'Pedro' },
+    });
+    fireEvent.change(screen.getByLabelText(/Apellido\(s\)/i), {
+      target: { value: 'Nel Ospina' },
+    });
+    fireEvent.change(screen.getByLabelText(/Explicación breve de tu caso \*/i), {
+      target: {
+        value: 'Tengo un problema de servidumbre de tránsito en mi parcela rural.',
+      },
+    });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Enviar caso al Asesor Jurídico/i })
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('¡Solicitud enviada a un Asesor Jurídico!')
+      ).toBeInTheDocument();
+      expect(screen.getByText('CASO-OTR')).toBeInTheDocument();
+    });
+  });
+
+  it('TC-T3-F13-01: separates EDAD_MENOR and GRADO_ESCOLAR_SOLICITADO into distinct questions with linear numeric and grade selector', () => {
+    renderWizardWithRoutes();
+
+    // Nivel 1 -> Educación
+    fireEvent.click(screen.getByRole('button', { name: /B\. Educación/i }));
+
+    // Nivel 2 -> Tutela cupo escolar
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /A mi hijo\(a\) menor de edad le niegan el cupo escolar/i,
       })
     );
 
-    renderWizardWithRoutes();
-
-    fireEvent.click(screen.getByRole('button', { name: /Enviar solicitud/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText('CASO-NAV1')).toBeInTheDocument();
+    // Variable 1: Nombre accionante
+    fireEvent.change(screen.getByLabelText(/Nombre\(s\) \*/i), {
+      target: { value: 'Martha' },
     });
+    fireEvent.change(screen.getByLabelText(/Apellido\(s\) \*/i), {
+      target: { value: 'Gómez' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
 
-    fireEvent.click(screen.getByRole('button', { name: /Ver estado y progreso del trámite/i }));
+    // Variable 2: Cédula
+    fireEvent.change(screen.getByPlaceholderText(/Ej: 1061234567/i), {
+      target: { value: '31999888' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
 
-    expect(screen.getByTestId('status-view')).toBeInTheDocument();
+    // Variable 3: Nombre del menor
+    fireEvent.change(screen.getByLabelText(/Nombre\(s\) \*/i), {
+      target: { value: 'Mateo' },
+    });
+    fireEvent.change(screen.getByLabelText(/Apellido\(s\) \*/i), {
+      target: { value: 'Gómez' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
+
+    // Variable 4: EDAD_MENOR (linear numeric input)
+    expect(
+      screen.getByText(/¿Qué edad tiene el niño, niña o adolescente\?/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Selección rápida lineal \(1 a 18 años\):/i)).toBeInTheDocument();
+
+    // Click linear age pill "8"
+    const age8Button = screen.getByRole('button', { name: '8' });
+    fireEvent.click(age8Button);
+    expect(screen.getByText(/8 años cumplidos/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente pregunta/i }));
+
+    // Variable 5: GRADO_ESCOLAR_SOLICITADO (grade selector)
+    expect(
+      screen.getByText(/¿Para qué grado escolar solicita el cupo\?/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Básica Primaria \(1° a 5°\):/i)).toBeInTheDocument();
+    expect(screen.getByText(/Secundaria y Media \(6° a 11°\):/i)).toBeInTheDocument();
+
+    // Click grade button "Tercero (3°)"
+    fireEvent.click(screen.getByRole('button', { name: 'Tercero (3°)' }));
+    expect(screen.getByText(/Grado escolar seleccionado:/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Tercero (3°)').length).toBeGreaterThanOrEqual(2);
   });
 });

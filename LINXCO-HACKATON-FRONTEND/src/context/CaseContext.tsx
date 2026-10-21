@@ -74,15 +74,28 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isOffline, setIsOffline] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Monitor browser online/offline status
+  // Monitor browser online/offline status and verify backend health
   useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
+    const handleOnline = () => {
+      setIsOffline(false);
+    };
     const handleOffline = () => setIsOffline(true);
 
     if (typeof window !== 'undefined') {
       window.addEventListener('online', handleOnline);
       window.addEventListener('offline', handleOffline);
-      if (!navigator.onLine) setIsOffline(true);
+      if (!navigator.onLine) {
+        setIsOffline(true);
+      } else {
+        // Ping backend to reset offline flag if backend is alive
+        fetch('/api/auth/usuarios-demo')
+          .then((res) => {
+            if (res.ok) setIsOffline(false);
+          })
+          .catch(() => {
+            // Keep offline if server is unreachable
+          });
+      }
     }
 
     return () => {
@@ -91,6 +104,30 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
         window.removeEventListener('offline', handleOffline);
       }
     };
+  }, []);
+
+  // Validate activeCode on startup; if it does not exist (like stale CASO-SMK), purge it
+  useEffect(() => {
+    if (activeCode && typeof window !== 'undefined') {
+      caseService
+        .getCase(activeCode)
+        .then((caso) => {
+          if (!caso.is_offline && navigator.onLine) {
+            setIsOffline(false);
+          }
+        })
+        .catch((err) => {
+          const msg = (err as Error)?.message || '';
+          const isNotFound =
+            msg.toLowerCase().includes('no se encontró') ||
+            (err as { status?: number })?.status === 404;
+          if (isNotFound) {
+            console.warn(`[CaseContext] Purging non-existent active code: ${activeCode}`);
+            setActiveCode(null);
+            setActiveCase(null);
+          }
+        });
+    }
   }, []);
 
   const setActiveCode = useCallback((code: string | null) => {
@@ -112,6 +149,8 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     if (caso?.is_offline) {
       setIsOffline(true);
+    } else if (caso && !caso.is_offline && navigator.onLine) {
+      setIsOffline(false);
     }
     if (typeof window !== 'undefined') {
       if (caso) {
@@ -149,11 +188,14 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadCaseByCode = useCallback(async (code: string): Promise<Caso> => {
     setIsLoading(true);
     setError(null);
+    const cleanCode = code ? code.trim().toUpperCase() : '';
     try {
-      const caso = await caseService.getCase(code);
+      const caso = await caseService.getCase(cleanCode);
       setActiveCase(caso);
       if (caso.is_offline) {
         setIsOffline(true);
+      } else if (navigator.onLine) {
+        setIsOffline(false);
       }
       // If the case contains a wizard draft, hydrate it
       if (caso.formulario_web) {
@@ -163,11 +205,19 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: unknown) {
       const msg = (err as Error)?.message || 'No se pudo cargar el caso';
       setError(msg);
+      // Si el caso no existe (404) y coincide con el código activo, purgar activeCode residual
+      const isNotFound =
+        msg.toLowerCase().includes('no se encontró') ||
+        (err as { status?: number })?.status === 404;
+      if (isNotFound && activeCode === cleanCode) {
+        setActiveCode(null);
+        setActiveCase(null);
+      }
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [setActiveCase, updateWizardDraft]);
+  }, [activeCode, setActiveCode, setActiveCase, updateWizardDraft]);
 
   const saveCase = useCallback(async (payload: CreateCasePayload): Promise<Caso> => {
     setIsLoading(true);
@@ -177,6 +227,8 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setActiveCase(created);
       if (created.is_offline) {
         setIsOffline(true);
+      } else if (navigator.onLine) {
+        setIsOffline(false);
       }
       return created;
     } catch (err: unknown) {
@@ -196,6 +248,8 @@ export const CaseProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setActiveCase(updated);
       if (updated.is_offline) {
         setIsOffline(true);
+      } else if (navigator.onLine) {
+        setIsOffline(false);
       }
       return updated;
     } catch (err: unknown) {

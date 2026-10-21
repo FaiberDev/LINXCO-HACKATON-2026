@@ -15,6 +15,7 @@ const SEED_CASES: Record<string, Caso> = {
   'CASO-SJH': {
     id: '60b195a7-f17e-49ee-93a5-4767852e4e26',
     codigo_sms: 'CASO-SJH',
+    asesor_asignado_id: '2560932a-26be-4c20-88bd-074e5389f29b',
     tipo_problema: 'Salud - Citas',
     estado: 'BORRADOR',
     formulario_web: {
@@ -22,6 +23,8 @@ const SEED_CASES: Record<string, Caso> = {
       mecanismo: 'Acción de tutela',
       problema: 'No me entregan medicamentos',
       ciudadano: {
+        nombres: 'María',
+        apellidos: 'Rodríguez',
         nombre_completo: 'María Rodríguez',
         tipo_documento: 'CC',
         numero_documento: '34567890',
@@ -48,6 +51,7 @@ const SEED_CASES: Record<string, Caso> = {
   'CASO-GTQ': {
     id: '69425dc2-e5ad-4ba9-a148-8a2068d7ea70',
     codigo_sms: 'CASO-GTQ',
+    asesor_asignado_id: '2560932a-26be-4c20-88bd-074e5389f29b',
     tipo_problema: 'Acción de Tutela',
     estado: 'VALIDADO',
     formulario_web: {
@@ -55,6 +59,8 @@ const SEED_CASES: Record<string, Caso> = {
       mecanismo: 'Acción de tutela',
       problema: 'No autorizan cirugía o tratamiento',
       ciudadano: {
+        nombres: 'José Albeiro',
+        apellidos: 'Cuetia',
         nombre_completo: 'José Albeiro Cuetia',
         tipo_documento: 'CC',
         numero_documento: '1061234567',
@@ -79,6 +85,7 @@ const SEED_CASES: Record<string, Caso> = {
   'CASO-123': {
     id: '7b8c9d0e-1f2a-3b4c-5d6e-7f8a9b0c1d2e',
     codigo_sms: 'CASO-123',
+    asesor_asignado_id: '5a2771b9-d6b7-4688-9e6a-3c9a9188d0c0',
     tipo_problema: 'Derecho de petición (Educación: Faltan profesores)',
     estado: 'RADICADO',
     formulario_web: {
@@ -86,6 +93,8 @@ const SEED_CASES: Record<string, Caso> = {
       mecanismo: 'Derecho de petición',
       problema: 'Faltan profesores',
       ciudadano: {
+        nombres: 'Carlos',
+        apellidos: 'Gómez',
         nombre_completo: 'Carlos Gómez',
         tipo_documento: 'CC',
         numero_documento: '1053456789',
@@ -164,7 +173,7 @@ export function saveOrUpdateMockCase(caso: Caso): Caso {
   const updated: Caso = {
     ...caso,
     codigo_sms: cleanCode,
-    is_offline: true,
+    is_offline: caso.is_offline ?? true,
   };
   cases[cleanCode] = updated;
   saveMockStorage(cases);
@@ -208,5 +217,66 @@ export function updateMockCase(codigo: string, patch: UpdateCasePayload): Caso |
     is_offline: true,
   };
 
+  return saveOrUpdateMockCase(updated);
+}
+
+export function findMockCaseByIdOrCode(idOrCode: string): Caso | null {
+  if (!idOrCode) return null;
+  const byCode = findMockCase(idOrCode);
+  if (byCode) return byCode;
+  const cases = getMockStorage();
+  for (const c of Object.values(cases)) {
+    if (c.id === idOrCode) return c;
+  }
+  return null;
+}
+
+export function listMockCases(filters?: {
+  estado?: string;
+  asesor_asignado_id?: string;
+}): Caso[] {
+  const cases = Object.values(getMockStorage());
+  return cases.filter((c) => {
+    if (filters?.estado && filters.estado !== 'TODOS' && c.estado !== filters.estado) {
+      return false;
+    }
+    if (filters?.asesor_asignado_id && c.asesor_asignado_id !== filters.asesor_asignado_id) {
+      return false;
+    }
+    return true;
+  });
+}
+
+export function assignMockCaseToAsesor(
+  idOrCode: string,
+  asesorId: string,
+  asesorNombre?: string
+): Caso | null {
+  const existing = findMockCaseByIdOrCode(idOrCode);
+  if (!existing) return null;
+
+  const updated: Caso = {
+    ...existing,
+    asesor_asignado_id: asesorId,
+    formulario_web: {
+      ...(existing.formulario_web || {}),
+      asesor_asignado_nombre: asesorNombre || 'Asesor Jurídico',
+      fecha_asignacion: new Date().toISOString(),
+    },
+  };
+  return saveOrUpdateMockCase(updated);
+}
+
+export function changeMockCaseEstado(
+  idOrCode: string,
+  nuevoEstado: Caso['estado']
+): Caso | null {
+  const existing = findMockCaseByIdOrCode(idOrCode);
+  if (!existing) return null;
+
+  const updated: Caso = {
+    ...existing,
+    estado: nuevoEstado,
+  };
   return saveOrUpdateMockCase(updated);
 }

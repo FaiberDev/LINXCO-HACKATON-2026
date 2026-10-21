@@ -89,7 +89,7 @@ describe('ContinuationPortal Feature & Acceptance Criteria (R3)', () => {
     expect(errorAlert).toHaveTextContent(/Por favor ingresa un código de seguimiento/i);
   });
 
-  it('TC-T1-F12-06: queries API and redirects draft case (BORRADOR) to /wizard', async () => {
+  it('TC-T1-F12-06: queries API and redirects case to /estado/:codigo', async () => {
     // Mock backend returning case in BORRADOR
     vi.spyOn(api, 'apiFetch').mockResolvedValue({
       success: true,
@@ -116,7 +116,7 @@ describe('ContinuationPortal Feature & Acceptance Criteria (R3)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Consultar trámite/i }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('wizard-view')).toBeInTheDocument();
+      expect(screen.getByTestId('status-view')).toBeInTheDocument();
     });
   });
 
@@ -205,8 +205,8 @@ describe('ContinuationPortal Feature & Acceptance Criteria (R3)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Consultar trámite/i }));
 
     await waitFor(() => {
-      // In BORRADOR -> routes to wizard
-      expect(screen.getByTestId('wizard-view')).toBeInTheDocument();
+      // Routes to status view
+      expect(screen.getByTestId('status-view')).toBeInTheDocument();
     });
   });
 
