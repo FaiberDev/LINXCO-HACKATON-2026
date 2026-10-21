@@ -212,11 +212,8 @@ export const CaseStatusView: React.FC = () => {
               </div>
             )}
 
-            {/* Generated Document Download with role-based restriction */}
+            {/* Generated Document Download: Los ciudadanos únicamente descargan el PDF oficial */}
             {Boolean(activeCase.ruta_documento || activeCase.formulario_web?.ruta_documento) && (() => {
-              const isOfficial = Boolean(
-                user && (user.rol === 'Jefe de Consultorio' || user.rol === 'Asesor Jurídico')
-              );
               const docxUrl = String(
                 activeCase.ruta_documento || activeCase.formulario_web?.ruta_documento || ''
               );
@@ -228,7 +225,6 @@ export const CaseStatusView: React.FC = () => {
 
               return (
                 <div className="flex flex-col gap-2">
-                  {/* Los ciudadanos SOLO pueden descargar el PDF estructurado oficial */}
                   <a
                     href={pdfUrl}
                     target="_blank"
@@ -239,20 +235,6 @@ export const CaseStatusView: React.FC = () => {
                     <FileText weight="duotone" className="w-5 h-5" />
                     <span>Descargar Documento Oficial (.pdf)</span>
                   </a>
-
-                  {/* Exclusivo para Asesores y Jefes de consultorio: versión editable Word */}
-                  {isOfficial && docxUrl && (
-                    <a
-                      href={docxUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      download
-                      className="w-full min-h-[46px] px-4 py-2.5 rounded-xl bg-white hover:bg-olive-100 text-charcoal-950 font-bold text-xs flex items-center justify-center gap-2 border-2 border-charcoal-800 transition"
-                    >
-                      <FileText weight="duotone" className="w-4 h-4 text-institucional-600" />
-                      <span>Descargar Versión Editable (.docx) [Exclusivo Asesor]</span>
-                    </a>
-                  )}
                 </div>
               );
             })()}

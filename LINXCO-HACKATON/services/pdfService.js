@@ -27,6 +27,55 @@ function dividirTextoEnLineas(texto, font, fontSize, maxWidth) {
 }
 
 /**
+ * Divide un texto para párrafos con encabezado/prefijo:
+ * - La primera línea usa el espacio restante disponible (anchoPrimeraLinea)
+ * - Las siguientes líneas ocupan el ancho completo (anchoLineasSiguientes)
+ */
+function dividirTextoEnLineasConPrefijo(
+  texto,
+  font,
+  fontSize,
+  anchoPrimeraLinea,
+  anchoLineasSiguientes
+) {
+  if (!texto) return [];
+  const palabras = String(texto).replace(/\s+/g, ' ').trim().split(' ');
+  const lineas = [];
+  let lineaActual = '';
+  let idx = 0;
+
+  // Llenar primera línea
+  while (idx < palabras.length) {
+    const prueba = lineaActual ? `${lineaActual} ${palabras[idx]}` : palabras[idx];
+    if (font.widthOfTextAtSize(prueba, fontSize) <= anchoPrimeraLinea) {
+      lineaActual = prueba;
+      idx++;
+    } else {
+      break;
+    }
+  }
+  if (lineaActual) {
+    lineas.push(lineaActual);
+    lineaActual = '';
+  }
+
+  // Llenar líneas subsecuentes con el ancho completo
+  while (idx < palabras.length) {
+    const prueba = lineaActual ? `${lineaActual} ${palabras[idx]}` : palabras[idx];
+    if (font.widthOfTextAtSize(prueba, fontSize) <= anchoLineasSiguientes) {
+      lineaActual = prueba;
+      idx++;
+    } else {
+      if (lineaActual) lineas.push(lineaActual);
+      lineaActual = palabras[idx];
+      idx++;
+    }
+  }
+  if (lineaActual) lineas.push(lineaActual);
+  return lineas;
+}
+
+/**
  * Convierte un archivo .docx generado a un PDF legal altamente estructurado
  * utilizando pdf-lib en memoria pura.
  */
@@ -85,10 +134,13 @@ async function generarPdfDesdeDocx(docxPath, pdfPath, codigo = 'CASO-DOC') {
       if (t) textRuns.push({ text: t, bold: isBold });
     });
 
-    const fullText = textRuns
+    // Concatenar directamente los fragmentos de texto para no añadir espacios espurios antes de los puntos
+    let fullText = textRuns
       .map((r) => r.text)
-      .join(' ')
+      .join('')
       .replace(/\s+/g, ' ')
+      .replace(/\s+\./g, '.')
+      .replace(/\.\.+/g, '.')
       .trim();
 
     if (!fullText) {
@@ -103,8 +155,8 @@ async function generarPdfDesdeDocx(docxPath, pdfPath, codigo = 'CASO-DOC') {
       );
 
     if (isSectionHeading) {
-      verificarEspacio(36);
-      y -= 14;
+      verificarEspacio(40);
+      y -= 16;
 
       currentPage.drawText(fullText.toUpperCase(), {
         x: MARGIN_LEFT,
@@ -116,13 +168,13 @@ async function generarPdfDesdeDocx(docxPath, pdfPath, codigo = 'CASO-DOC') {
 
       // Línea sutil decorativa bajo el encabezado
       currentPage.drawLine({
-        start: { x: MARGIN_LEFT, y: y - 3 },
-        end: { x: MARGIN_LEFT + USABLE_WIDTH, y: y - 3 },
-        thickness: 0.5,
+        start: { x: MARGIN_LEFT, y: y - 4 },
+        end: { x: MARGIN_LEFT + USABLE_WIDTH, y: y - 4 },
+        thickness: 0.8,
         color: colorBorde,
       });
 
-      y -= 14;
+      y -= 16;
       continue;
     }
 
@@ -132,8 +184,8 @@ async function generarPdfDesdeDocx(docxPath, pdfPath, codigo = 'CASO-DOC') {
         fullText
       );
     if (isSubHeading && fullText.length < 35) {
-      verificarEspacio(24);
-      y -= 8;
+      verificarEspacio(26);
+      y -= 10;
       currentPage.drawText(fullText.toUpperCase(), {
         x: MARGIN_LEFT,
         y,
@@ -141,7 +193,7 @@ async function generarPdfDesdeDocx(docxPath, pdfPath, codigo = 'CASO-DOC') {
         font: fontBold,
         color: colorVerde,
       });
-      y -= 12;
+      y -= 13;
       continue;
     }
 
@@ -151,19 +203,23 @@ async function generarPdfDesdeDocx(docxPath, pdfPath, codigo = 'CASO-DOC') {
     );
 
     if (ordinalMatch) {
-      const prefix = ordinalMatch[1];
-      const rest = ordinalMatch[2];
+      const rawPrefix = ordinalMatch[1];
+      const prefix = rawPrefix.replace(/\s+\./g, '.').trim() + ' ';
+      const rest = ordinalMatch[2].replace(/\.\.+/g, '.').trim();
       const prefixWidth = fontBold.widthOfTextAtSize(prefix, 9.5);
-      const lineas = dividirTextoEnLineas(
+
+      // La primera línea va a continuación del prefijo, y las siguientes ocupan el margen completo
+      const lineas = dividirTextoEnLineasConPrefijo(
         rest,
         fontRegular,
         9.5,
-        USABLE_WIDTH - prefixWidth - 4
+        USABLE_WIDTH - prefixWidth - 2,
+        USABLE_WIDTH
       );
 
-      verificarEspacio((lineas.length || 1) * 13 + 6);
+      verificarEspacio((lineas.length || 1) * 13.5 + 8);
 
-      // Prefijo en negrilla
+      // Dibujar prefijo en negrilla (ej: "PRIMERO. ")
       currentPage.drawText(prefix, {
         x: MARGIN_LEFT,
         y,
@@ -172,31 +228,33 @@ async function generarPdfDesdeDocx(docxPath, pdfPath, codigo = 'CASO-DOC') {
         color: colorTexto,
       });
 
+      // Dibujar primera línea
       if (lineas.length > 0) {
         currentPage.drawText(lineas[0], {
-          x: MARGIN_LEFT + prefixWidth + 2,
+          x: MARGIN_LEFT + prefixWidth,
           y,
           size: 9.5,
           font: fontRegular,
           color: colorTexto,
         });
-        y -= 13;
+        y -= 13.5;
 
+        // Dibujar líneas siguientes alineadas al margen completo (párrafo armónico)
         for (let i = 1; i < lineas.length; i++) {
-          verificarEspacio(13);
+          verificarEspacio(13.5);
           currentPage.drawText(lineas[i], {
-            x: MARGIN_LEFT + prefixWidth + 2,
+            x: MARGIN_LEFT,
             y,
             size: 9.5,
             font: fontRegular,
             color: colorTexto,
           });
-          y -= 13;
+          y -= 13.5;
         }
       } else {
-        y -= 13;
+        y -= 13.5;
       }
-      y -= 3;
+      y -= 6; // Espacio entre cada hecho o pretensión para lectura estructurada
       continue;
     }
 
@@ -207,18 +265,19 @@ async function generarPdfDesdeDocx(docxPath, pdfPath, codigo = 'CASO-DOC') {
       );
     if (isReference) {
       const colonIdx = fullText.indexOf(':');
-      const label = fullText.slice(0, colonIdx + 1);
-      const val = fullText.slice(colonIdx + 1).trim();
+      const label = fullText.slice(0, colonIdx + 1).replace(/\s+/g, ' ').trim() + ' ';
+      const val = fullText.slice(colonIdx + 1).replace(/\s+/g, ' ').trim();
 
-      const labelWidth = fontBold.widthOfTextAtSize(label + ' ', 9.5);
-      const lineas = dividirTextoEnLineas(
+      const labelWidth = fontBold.widthOfTextAtSize(label, 9.5);
+      const lineas = dividirTextoEnLineasConPrefijo(
         val,
         fontRegular,
         9.5,
-        USABLE_WIDTH - labelWidth - 2
+        USABLE_WIDTH - labelWidth - 2,
+        USABLE_WIDTH
       );
 
-      verificarEspacio((lineas.length || 1) * 13 + 4);
+      verificarEspacio((lineas.length || 1) * 13 + 5);
 
       currentPage.drawText(label, {
         x: MARGIN_LEFT,
@@ -240,7 +299,7 @@ async function generarPdfDesdeDocx(docxPath, pdfPath, codigo = 'CASO-DOC') {
         for (let i = 1; i < lineas.length; i++) {
           verificarEspacio(13);
           currentPage.drawText(lineas[i], {
-            x: MARGIN_LEFT + labelWidth,
+            x: MARGIN_LEFT,
             y,
             size: 9.5,
             font: fontRegular,
@@ -251,7 +310,7 @@ async function generarPdfDesdeDocx(docxPath, pdfPath, codigo = 'CASO-DOC') {
       } else {
         y -= 13;
       }
-      y -= 3;
+      y -= 4;
       continue;
     }
 

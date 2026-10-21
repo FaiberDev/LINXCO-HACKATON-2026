@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCase } from '../context/CaseContext';
-import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../services/api';
 import { MunicipalityAutocomplete } from '../components/forms/MunicipalityAutocomplete';
 import {
@@ -402,11 +401,6 @@ export const WizardView: React.FC = () => {
   const [explicacionOtra, setExplicacionOtra] = useState<string>('');
   const [telefonoContactoOtra, setTelefonoContactoOtra] = useState<string>(
     wizardDraft.ciudadano?.telefono || ''
-  );
-
-  const { user } = useAuth();
-  const isOfficial = Boolean(
-    user && (user.rol === 'Jefe de Consultorio' || user.rol === 'Asesor Jurídico')
   );
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1259,7 +1253,7 @@ export const WizardView: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 mt-2 flex-wrap">
-          {/* Ciudadanos SOLO pueden descargar el PDF estructurado oficial */}
+          {/* El ciudadano/usuario que completa el trámite únicamente descarga el PDF oficial estructurado */}
           {(submittedPdfUrl || submittedDocUrl) && (
             <a
               href={submittedPdfUrl || `/api/casos/${encodeURIComponent(submittedCode)}/pdf`}
@@ -1270,20 +1264,6 @@ export const WizardView: React.FC = () => {
             >
               <DownloadSimple weight="bold" className="w-5 h-5" />
               <span>Descargar Documento Oficial (.pdf)</span>
-            </a>
-          )}
-
-          {/* Exclusivo para Asesores y Jefes de consultorio: versión editable Word */}
-          {isOfficial && submittedDocUrl && (
-            <a
-              href={submittedDocUrl}
-              download
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 min-h-[50px] px-4 py-3 rounded-xl bg-white hover:bg-olive-100 text-charcoal-950 font-bold text-sm flex items-center justify-center gap-2 border-2 border-charcoal-800 shadow-sm transition"
-            >
-              <FileDoc weight="duotone" className="w-5 h-5 text-institucional-600" />
-              <span>Descargar Word (.docx) [Asesor]</span>
             </a>
           )}
 

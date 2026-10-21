@@ -177,7 +177,7 @@ function construirVariablesPlantilla(datos = {}, codigo = 'CASO-SIN-CODIGO') {
     fuente.email ||
     'notificaciones@justiciaparatodos.gov.co';
 
-  const municipio =
+  let municipio =
     ciudadano.municipio ||
     fuente.MUNICIPIO ||
     fuente.CIUDAD ||
@@ -187,13 +187,22 @@ function construirVariablesPlantilla(datos = {}, codigo = 'CASO-SIN-CODIGO') {
     fuente.municipio ||
     'La Cumbre';
 
-  const departamento =
+  let departamento =
     ciudadano.departamento ||
     fuente.DEPARTAMENTO ||
     fuente.departamento ||
     'Valle del Cauca';
 
-  const vereda =
+  // Si municipio viene en formato "La Cumbre, Valle del Cauca", extraer componentes limpios
+  if (municipio.includes(',')) {
+    const parts = municipio.split(',').map((p) => p.trim());
+    municipio = parts[0];
+    if (parts[1]) {
+      departamento = parts[1];
+    }
+  }
+
+  let vereda =
     ciudadano.vereda ||
     fuente.VEREDA_RESIDENCIA ||
     fuente.VEREDA_CORREGIMIENTO_O_BARRIO ||
@@ -201,7 +210,21 @@ function construirVariablesPlantilla(datos = {}, codigo = 'CASO-SIN-CODIGO') {
     fuente.NOMBRE_VEREDA_CARRETERA ||
     fuente.DIRECCION_EXACTA_BARRIO_SECTOR_VEREDA ||
     fuente.vereda ||
-    municipio;
+    '';
+
+  // Limpiar vereda si contiene repetido el departamento o país
+  if (vereda) {
+    vereda = vereda
+      .replace(new RegExp(`,\\s*${departamento}`, 'gi'), '')
+      .replace(/,\s*Valle del Cauca/gi, '')
+      .replace(/,\s*Colombia/gi, '')
+      .trim();
+  }
+
+  const veredaDisplay =
+    vereda && vereda.toLowerCase() !== municipio.toLowerCase()
+      ? vereda
+      : `la zona rural de ${municipio}`;
 
   const direccion =
     ciudadano.direccion ||
@@ -210,7 +233,9 @@ function construirVariablesPlantilla(datos = {}, codigo = 'CASO-SIN-CODIGO') {
     fuente.DIRECCION_DOMICILIARIA_COMPLETA ||
     fuente.DIRECCION_COMPLETA_RESIDENCIA_BARRIO_CIUDAD ||
     fuente.DIRECCION_EXACTA_BARRIO_SECTOR_VEREDA ||
-    `${vereda}, ${municipio}`;
+    (vereda && vereda.toLowerCase() !== municipio.toLowerCase()
+      ? `${vereda}, ${municipio}`
+      : `${municipio}, ${departamento}`);
 
   const entidad =
     (typeof fuente.entidad === 'string' ? fuente.entidad : fuente.entidad?.nombre) ||
@@ -321,7 +346,7 @@ function construirVariablesPlantilla(datos = {}, codigo = 'CASO-SIN-CODIGO') {
     NOMBRE_COMPLETO_EPS_O_IPS_ACCIONADA: entidad,
     DIRECCION_FISICA_EPS_IPS: `Sede administrativa de ${entidad} en ${municipio}`,
     CORREO_ELECTRONICO_EPS_IPS: 'notificaciones@eps.com.co',
-    VEREDA_CORREGIMIENTO_O_BARRIO: vereda,
+    VEREDA_CORREGIMIENTO_O_BARRIO: veredaDisplay,
     REGIMEN_CONTRIBUTIVO_O_SUBSIDIADO: 'Subsidiado',
     CALIDAD_AFILIACION_COTIZANTE_BENEFICIARIO_SUBSIDIADO: 'Afiliado / Subsidiado',
     DIAGNOSTICO_MEDICO: diagnostico,
@@ -395,9 +420,13 @@ function construirVariablesPlantilla(datos = {}, codigo = 'CASO-SIN-CODIGO') {
     ANO_LECTIVO: String(new Date().getFullYear()),
     ENTIDAD_RECEPTORA_SOLICITUD: entidad,
     DESCRIPCION_GESTIONES_REALIZADAS_Y_FECHAS: hechos,
-    RESPUESTA_ENTIDAD_O_INDICAR_SIN_RESPUESTA: peticion,
+    RESPUESTA_ENTIDAD_O_INDICAR_SIN_RESPUESTA:
+      fuente.RESPUESTA_ENTIDAD_O_INDICAR_SIN_RESPUESTA ||
+      fuente.respuesta_entidad ||
+      'ninguna respuesta o solución por parte de la entidad a la fecha',
     DESCRIPCION_CONDICIONES_DE_ACCESO_Y_TRANSPORTE:
-      `Residente en zona rural (${vereda}, ${municipio}) sin otra oferta educativa cercana`,
+      fuente.DESCRIPCION_CONDICIONES_DE_ACCESO_Y_TRANSPORTE ||
+      `Residente en sector rural (${veredaDisplay}) sin otra oferta educativa cercana y con dificultades de transporte`,
 
     // Variables de Servicios Públicos (Agua Potable y Energía Eléctrica)
     NOMBRE_EMPRESA_PRESTADORA_ACUEDUCTO: entidad,
